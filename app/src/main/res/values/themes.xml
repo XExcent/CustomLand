@@ -44,10 +44,10 @@
         <item name="android:color">@color/theme20</item>
     </style>
 
-    <style name="MyDialogTheme" parent="ThemeOverlay.Material3Expressive.MaterialAlertDialog.Centered">
+    <style name="MyDialogTheme" parent="ThemeOverlay.Material3Expressive.MaterialAlertDialog">
         <item name="android:background">@color/background</item>
         <item name="buttonBarPositiveButtonStyle">@style/DialogFilledButton</item>
-        <item name="materialAlertDialogTitleIconStyle">@style/DialogIconStyle</item>
+        <!-- <item name="materialAlertDialogTitleIconStyle">@style/DialogIconStyle</item> -->
     </style>
 
     <style name="DialogFilledButton" parent="Widget.Material3Expressive.Button">

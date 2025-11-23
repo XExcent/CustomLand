@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import com.dylanc.longan.logDebug
+import com.dylanc.longan.logError
 import com.mukapp.customland.Constants.MAX_HISTORY_SIZE
 import com.mukapp.customland.Constants.PREF_HISTORY_JSON
 import com.mukapp.customland.Constants.PREF_NOTIFICATION_HISTORY
@@ -18,7 +19,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -45,11 +45,14 @@ object NotificationHandler {
     ): Int {
         // 只有新通知才添加到历史（notificationId == null 表示新通知）
         // 重新发送的通知（notificationId != null）不应该重复记录
-        if (notificationId != null && result.error != true) {
+        // 包括错误通知也会添加到历史记录
+        if (notificationId != null) {
             _history.add(0, result) // Add to top
             // 限制历史记录数量
             if (_history.size > MAX_HISTORY_SIZE) {
-                _history.removeAt(_history.size - 1)
+                val removedItem = _history.removeAt(_history.size - 1)
+                // 删除被移除项的截图
+                deleteScreenshot(context, removedItem)
             }
             // 使用应用协程作用域替代 GlobalScope
             BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
@@ -248,7 +251,7 @@ object NotificationHandler {
                 "param_v2",
                 buildJsonObject {
                     put("protocol", 1)
-                    put("business", "taxi")
+                    // put("business", "taxi")
                     put("enableFloat", true)
                     put("updatable", true)
                     put("reopen", "reopen")
@@ -415,9 +418,25 @@ object NotificationHandler {
     /** 删除历史记录中的指定项 */
     fun deleteHistoryItem(context: Context, item: RecognizerResult) {
         _history.remove(item)
+        deleteScreenshot(context, item)
         BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
             saveHistory(context)
         }
         onHistoryUpdated?.invoke()
+    }
+
+    /** 删除截图文件 */
+    private fun deleteScreenshot(context: Context, item: RecognizerResult) {
+        item.screenshotPath?.let { path ->
+            try {
+                val file = java.io.File(context.filesDir, path)
+                if (file.exists()) {
+                    file.delete()
+                    logDebug("已删除截图: ${file.absolutePath}")
+                }
+            } catch (e: Exception) {
+                logError("删除截图失败", e)
+            }
+        }
     }
 }

@@ -30,6 +30,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 详情页 -->
+        <activity
+            android:name=".DetailActivity"
+            android:exported="false" />
+
         <!-- 快捷磁贴服务 -->
         <service
             android:name=".service.ScreenshotTileService"

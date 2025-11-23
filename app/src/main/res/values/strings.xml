@@ -16,7 +16,7 @@
     <string name="action_cancel">取消</string>
     <string name="toast_enable_accessibility">请先开启无障碍服务</string>
     <string name="status_recognizing">识别中</string>
-    
+
     <!-- 对话框 -->
     <string name="dialog_resend_title">重新发送通知</string>
     <string name="dialog_resend_message">确定要重新发送这条通知吗？如果是超级岛通知需要退出软件界面才能显示</string>
@@ -29,4 +29,23 @@
     <string name="developer_name">开发者：MUK</string>
     <string name="coolapk_link_text">打开开发者酷安</string>
     <string name="app_version">软件版本：%1$s</string>
+
+    <!-- 详情页 -->
+    <string name="detail_title">通知详情</string>
+    <string name="action_back">返回</string>
+    <string name="tab_screenshot">截图</string>
+    <string name="tab_debug_info">调试信息</string>
+    <string name="screenshot_description">通知截图</string>
+    <string name="no_screenshot">暂无截图</string>
+    <string name="no_debug_info">暂无调试信息</string>
+    <string name="debug_duration">耗时</string>
+    <string name="debug_error_message">错误信息</string>
+    <string name="debug_request_json">请求 JSON</string>
+    <string name="debug_response_json">响应 JSON</string>
+    <string name="duration_format">%d 毫秒</string>
+
+    <!-- 操作对话框 -->
+    <string name="dialog_action_title">选择操作</string>
+    <string name="action_view_detail">查看详情</string>
+    <string name="action_resend">再次发送</string>
 </resources>

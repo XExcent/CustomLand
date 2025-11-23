@@ -19,6 +19,7 @@ import com.mukapp.customland.Constants.SCREENSHOT_DELAY_MS
 import com.mukapp.customland.NotificationHandler
 import com.mukapp.customland.R
 import com.mukapp.customland.RecognizerResult
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -110,46 +111,63 @@ class ScreenshotAccessibilityService : AccessibilityService() {
         // 启动协程执行AI任务和发送通知
         serviceScope.launch(Dispatchers.IO) {
             var notificationId: Int? = null
+            var screenshotPath: String? = null
+
             try {
+                // 保存截图到内部存储
+                screenshotPath = saveScreenshot(bitmap)
+
                 // 1. 调用AI识别 (占位符)
                 notificationId =
                     NotificationHandler.sendNotification(
                         applicationContext,
                         RecognizerResult(title = getString(R.string.status_recognizing))
                     )
-                val recognitionResult = AiRecognizer.analyze(bitmap)
-                // 2. 发送通知
-                if (recognitionResult.error != true) {
-                    NotificationHandler.sendNotification(
-                        applicationContext,
-                        recognitionResult,
-                        notificationId
-                    )
-                } else {
-                    NotificationHandler.cancelNotification(applicationContext, notificationId)
-                    NotificationHandler.sendStandardNotification(
-                        applicationContext,
-                        "识别失败",
-                        recognitionResult.title
-                    )
-                }
+                val recognitionResult = AiRecognizer.analyze(bitmap, screenshotPath)
+                // 发送通知（无论成功还是失败）
+                NotificationHandler.sendNotification(
+                    applicationContext,
+                    recognitionResult,
+                    notificationId
+                )
             } catch (e: Exception) {
                 logError("识别失败", e)
-                // 取消通知
+                // 取消"识别中"通知
                 notificationId?.let {
                     NotificationHandler.cancelNotification(applicationContext, it)
                 }
-                // 发送失败通知
-                NotificationHandler.sendStandardNotification(
-                    applicationContext,
-                    "识别失败",
-                    e.message.toString()
-                )
+                // 构建错误结果并发送通知
+                val errorResult =
+                    RecognizerResult(
+                        title = e::class.simpleName ?: "Exception",
+                        content = "识别异常",
+                        error = true,
+                        errorMessage = e.message ?: e.toString(),
+                        screenshotPath = screenshotPath
+                    )
+                NotificationHandler.sendNotification(applicationContext, errorResult)
             } finally {
                 // 释放Bitmap
                 bitmap.recycle()
             }
         }
+    }
+
+    /** 保存截图到内部存储 */
+    private fun saveScreenshot(bitmap: Bitmap): String {
+        val screenshotsDir = File(applicationContext.filesDir, "screenshots")
+        if (!screenshotsDir.exists()) {
+            screenshotsDir.mkdirs()
+        }
+
+        val timestamp = System.currentTimeMillis()
+        val filename = "screenshot_$timestamp.jpg"
+        val file = File(screenshotsDir, filename)
+
+        file.outputStream().use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out) }
+
+        logDebug("截图已保存：${file.absolutePath}")
+        return "screenshots/$filename" // 返回相对路径
     }
 
     // 收起通知栏

@@ -6,7 +6,6 @@ import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -16,6 +15,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
+import java.net.URL
 
 object AiRecognizer {
     var api: String = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
@@ -23,11 +23,16 @@ object AiRecognizer {
     var model: String = "glm-4v-flash"
 
     /**
-     * @param bitmap The screenshot to be recognized
-     * @return The recognized text result
+     * @param bitmap 待识别截图
+     * @param screenshotPath 截图保存路径（可选）
+     * @return 识别出的文字结果
      */
-    suspend fun analyze(bitmap: Bitmap): RecognizerResult {
+    suspend fun analyze(bitmap: Bitmap, screenshotPath: String? = null): RecognizerResult {
         return withContext(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+            var requestJson = ""
+            var responseJson = ""
+
             try {
                 logDebug("开始请求")
 
@@ -35,13 +40,6 @@ object AiRecognizer {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
                 val base64Image =
                     Base64.encodeToString(byteArrayOutputStream.toByteArray(), Base64.NO_WRAP)
-
-                val url = URL(api)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer $apikey")
-                connection.doOutput = true
 
                 val promptText =
                     """
@@ -95,8 +93,6 @@ object AiRecognizer {
                                 addJsonObject {
                                     put("type", "image_url")
                                     putJsonObject("image_url") {
-                                        // 注意：这里假设 base64Image 变量里不包含 "data:image..." 前缀，
-                                        // 如果已有前缀，请直接使用 $base64Image
                                         put("url", "data:image/jpeg;base64,$base64Image")
                                     }
                                 }
@@ -106,6 +102,16 @@ object AiRecognizer {
                 }
 
                 val jsonInputString = jsonObject.toString()
+                // 立即省略base64图片数据并保存到requestJson，确保即使后续出错也能记录
+                requestJson = omitBase64FromJson(jsonInputString)
+
+                // 建立网络连接（放在JSON构建之后，确保即使连接失败也有requestJson）
+                val url = URL(api)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $apikey")
+                connection.doOutput = true
 
                 connection.outputStream.use { os ->
                     val input = jsonInputString.toByteArray(Charsets.UTF_8)
@@ -118,6 +124,8 @@ object AiRecognizer {
                         connection.inputStream.bufferedReader(Charsets.UTF_8).use {
                             it.readText()
                         }
+                    responseJson = response
+
                     logDebug("请求成功，响应：$response")
                     val jsonResponse = JSONObject(response)
                     val jsonContent =
@@ -139,6 +147,15 @@ object AiRecognizer {
                     val infoContent = resultJson.optString("infoContent")
                     val subInfoTitle = resultJson.optString("subInfoTitle")
                     val subInfoContent = resultJson.optString("subInfoContent")
+
+                    val duration = System.currentTimeMillis() - startTime
+                    val debugInfo =
+                        DebugInfo(
+                            requestJson = requestJson,
+                            responseJson = responseJson,
+                            durationMs = duration
+                        )
+
                     if (title.isNotEmpty()) {
                         RecognizerResult(
                             title = title,
@@ -146,27 +163,70 @@ object AiRecognizer {
                             infoTitle = infoTitle,
                             infoContent = infoContent,
                             subInfoTitle = subInfoTitle,
-                            subInfoContent = subInfoContent
+                            subInfoContent = subInfoContent,
+                            screenshotPath = screenshotPath,
+                            debugInfo = debugInfo
                         )
                     } else {
-                        RecognizerResult(title = "识别失败", content = cleanedContent, error = true)
+                        RecognizerResult(
+                            title = cleanedContent,
+                            content = "识别失败",
+                            error = true,
+                            errorMessage = "AI返回的title为空",
+                            screenshotPath = screenshotPath,
+                            debugInfo = debugInfo
+                        )
                     }
                 } else {
                     val error =
                         connection.errorStream.bufferedReader(Charsets.UTF_8).use {
                             it.readText()
                         }
+                    responseJson = error
+
                     logError("请求失败，响应码：$responseCode，错误：$error")
-                    RecognizerResult(title = error, error = true)
+
+                    val duration = System.currentTimeMillis() - startTime
+                    RecognizerResult(
+                        title = "响应码: $responseCode",
+                        content = "网络请求失败",
+                        error = true,
+                        errorMessage = error,
+                        screenshotPath = screenshotPath,
+                        debugInfo = DebugInfo(requestJson, responseJson, duration)
+                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 logError("请求出错", e)
-                RecognizerResult(title = e.toString(), error = true)
+
+                val duration = System.currentTimeMillis() - startTime
+                RecognizerResult(
+                    title = e::class.simpleName ?: "Exception",
+                    content = "识别异常",
+                    error = true,
+                    errorMessage = e.message ?: e.toString(),
+                    screenshotPath = screenshotPath,
+                    debugInfo =
+                        if (requestJson.isNotEmpty()) {
+                            DebugInfo(requestJson, responseJson.ifEmpty { "无响应" }, duration)
+                        } else null
+                )
             }
         }
     }
+
+    /** 省略JSON中的base64图片数据，避免显示时卡顿 */
+    private fun omitBase64FromJson(json: String): String {
+        val regex = Regex("""(data:image/jpeg;base64,)[A-Za-z0-9+/=]{50,}""")
+        return regex.replace(json) { matchResult ->
+            "${matchResult.groupValues[1]}......图片base64此处省略......"
+        }
+    }
 }
+
+@Serializable
+data class DebugInfo(val requestJson: String, val responseJson: String, val durationMs: Long)
 
 @Serializable
 data class RecognizerResult(
@@ -178,5 +238,8 @@ data class RecognizerResult(
     val infoContent: String = "",
     val subInfoTitle: String = "",
     val subInfoContent: String = "",
-    val error: Boolean? = false
+    val error: Boolean? = false,
+    val errorMessage: String? = null, // 错误信息
+    val screenshotPath: String? = null, // 截图保存路径
+    val debugInfo: DebugInfo? = null // 调试信息
 )

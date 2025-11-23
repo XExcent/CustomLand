@@ -11,16 +11,20 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.ArrayAdapter
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
+import com.dylanc.longan.appVersionName
 import com.dylanc.longan.dp
 import com.dylanc.longan.toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -36,21 +40,18 @@ import com.mukapp.customland.utils.applyAppTheme
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
 import com.mukapp.customland.utils.setupPreferenceWatcher
 import kotlinx.coroutines.launch
-import androidx.core.net.toUri
-import androidx.recyclerview.widget.RecyclerView
-import com.dylanc.longan.appVersionName
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val notificationAdapter =
         NotificationAdapter(
             onItemClick = { result ->
-                // 点击列表项，弹出重新发送通知确认对话框
-                showResendConfirmDialog(result)
+                // 点击列表项，跳转到详情页
+                DetailActivity.start(this, result.id)
             },
             onItemLongClick = { result ->
-                // 长按列表项，显示删除对话框
-                showDeleteConfirmDialog(result)
+                // 长按列表项，显示操作选择对话框
+                showActionDialog(result)
             }
         )
 
@@ -406,21 +407,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /** 显示重新发送通知确认对话框 */
-    private fun showResendConfirmDialog(result: RecognizerResult) {
-        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
-            .applyAppTheme()
-            .setTitle(getString(R.string.dialog_resend_title))
-            .setMessage(getString(R.string.dialog_resend_message))
-            .setPositiveButton(getString(R.string.action_send)) { _, _ ->
-                NotificationHandler.sendNotification(this, result)
-                toast(getString(R.string.toast_resent))
-            }
-            .setNegativeButton(getString(R.string.action_cancel), null)
-            .setIcon(R.drawable.notifications_unread)
-            .show()
-    }
-
     /** 显示删除确认对话框 */
     private fun showDeleteConfirmDialog(result: RecognizerResult) {
         MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
@@ -433,6 +419,35 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(getString(R.string.action_cancel), null)
             .setIcon(R.drawable.delete_forever)
+            .show()
+    }
+
+    /** 显示操作选择对话框 */
+    private fun showActionDialog(result: RecognizerResult) {
+        val items = arrayOf(
+            getString(R.string.action_resend),
+            getString(R.string.action_delete)
+        )
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(getString(R.string.dialog_action_title))
+            .setAdapter(adapter) { _, which ->
+                when (which) {
+                    0 -> {
+                        // 再次发送
+                        NotificationHandler.sendNotification(this, result)
+                        toast(getString(R.string.toast_resent))
+                    }
+
+                    1 -> {
+                        // 删除
+                        showDeleteConfirmDialog(result)
+                    }
+                }
+            }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.action_key)
             .show()
     }
 }
