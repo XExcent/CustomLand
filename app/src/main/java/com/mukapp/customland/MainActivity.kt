@@ -1,0 +1,438 @@
+package com.mukapp.customland
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.View
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.toColorInt
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
+import com.dylanc.longan.dp
+import com.dylanc.longan.toast
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.mukapp.customland.Constants.EXTRA_TARGET_PAGE
+import com.mukapp.customland.Constants.PREF_API_ADDRESS
+import com.mukapp.customland.Constants.PREF_API_KEY
+import com.mukapp.customland.Constants.PREF_APP_SETTINGS
+import com.mukapp.customland.Constants.PREF_MODEL_NAME
+import com.mukapp.customland.Constants.TARGET_PAGE_SETTING
+import com.mukapp.customland.databinding.ActivityMainBinding
+import com.mukapp.customland.service.ScreenshotAccessibilityService
+import com.mukapp.customland.utils.applyAppTheme
+import com.mukapp.customland.utils.isAccessibilityServiceEnabled
+import com.mukapp.customland.utils.setupPreferenceWatcher
+import kotlinx.coroutines.launch
+import androidx.core.net.toUri
+import androidx.recyclerview.widget.RecyclerView
+import com.dylanc.longan.appVersionName
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+    private val notificationAdapter =
+        NotificationAdapter(
+            onItemClick = { result ->
+                // 点击列表项，弹出重新发送通知确认对话框
+                showResendConfirmDialog(result)
+            },
+            onItemLongClick = { result ->
+                // 长按列表项，显示删除对话框
+                showDeleteConfirmDialog(result)
+            }
+        )
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            updateNotificationStatus()
+            if (!isGranted) {
+                showNotificationPermissionDialog()
+            }
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val imeHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            binding.blurViewToolbar.updatePadding(top = systemBars.top)
+
+            binding.pageHome.updatePadding(
+                top = systemBars.top + 56.dp.toInt(),
+                bottom = systemBars.bottom + 64.dp.toInt()
+            )
+            binding.pageSetting.updatePadding(
+                top = systemBars.top + 56.dp.toInt(),
+                bottom =
+                    if (imeHeight == 0) {
+                        systemBars.bottom + 64.dp.toInt()
+                    } else {
+                        imeHeight
+                    }
+            )
+
+            if (imeHeight > 0) {
+                binding.pageSetting.post {
+                    binding.pageSetting.scrollTo(0, binding.pageSetting.bottom)
+                }
+            }
+
+            val baseThumb =
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 2.dp // 当所有圆角相同时，可以这样简写
+                    setColor("#80808080".toColorInt()) // 滚动条颜色，建议半透明
+                    setSize(4.dp.toInt(), 0) // 设置宽度
+                }
+
+            val noInsetThumb = InsetDrawable(baseThumb, 0)
+
+            binding.pageHome.verticalScrollbarThumbDrawable = noInsetThumb
+            binding.pageSetting.verticalScrollbarThumbDrawable = noInsetThumb
+            insets
+        }
+
+        // 拦截 BottomNavigationView 的 Insets 处理
+        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNav) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(bottom = systemBars.bottom)
+            insets
+        }
+
+        binding.toolbarTitle.text = this.title
+
+        val decorView = window.decorView
+
+        binding.blurViewToolbar
+            .setupWith(binding.blurTarget)
+            .setBlurRadius(16f)
+            .setFrameClearDrawable(decorView.background)
+        binding.blurViewBottomNav
+            .setupWith(binding.blurTarget)
+            .setBlurRadius(16f)
+            .setFrameClearDrawable(decorView.background)
+
+        // Load history
+        lifecycleScope.launch { NotificationHandler.loadHistory(this@MainActivity) }
+
+        // Setup RecyclerView
+        binding.pageHome.apply {
+            layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this@MainActivity)
+            adapter = notificationAdapter
+        }
+        binding.pageHome.addItemDecoration(object : RecyclerView.ItemDecoration() {
+            override fun getItemOffsets(
+                outRect: Rect,
+                view: View,
+                parent: RecyclerView,
+                state: RecyclerView.State
+            ) {
+                val position = parent.getChildAdapterPosition(view)
+                val itemCount = state.itemCount
+                if (position == 0) {
+                    outRect.top = 8.dp.toInt()
+                }
+                if (position == itemCount - 1) {
+                    outRect.bottom = 8.dp.toInt()
+                }
+            }
+        })
+
+        // Observe History
+        NotificationHandler.onHistoryUpdated = {
+            runOnUiThread { notificationAdapter.submitList(NotificationHandler.history.toList()) }
+        }
+        // Initial load
+        notificationAdapter.submitList(NotificationHandler.history.toList())
+
+        binding.version.text = getString(R.string.app_version, appVersionName)
+
+        // Settings Page Logic
+        binding.coolapkButton.setOnClickListener {
+            val uri = "http://www.coolapk.com/u/1105973".toUri()
+            val intent = Intent(Intent.ACTION_VIEW, uri)
+            startActivity(intent)
+        }
+
+        binding.cardAccessibility.setOnClickListener {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+        }
+
+        binding.cardNotification.setOnClickListener { askNotificationPermission() }
+
+        // AI Settings Logic
+        val prefs = getSharedPreferences(PREF_APP_SETTINGS, MODE_PRIVATE)
+
+        // Load saved values
+        val savedApi = prefs.getString(PREF_API_ADDRESS, AiRecognizer.api)
+        val savedKey = prefs.getString(PREF_API_KEY, AiRecognizer.apikey)
+        val savedModel = prefs.getString(PREF_MODEL_NAME, AiRecognizer.model)
+
+        if (savedApi != null) AiRecognizer.api = savedApi
+        if (savedKey != null) AiRecognizer.apikey = savedKey
+        if (savedModel != null) AiRecognizer.model = savedModel
+
+        binding.etApiAddress.setText(savedApi)
+        binding.etApiKey.setText(savedKey)
+        binding.etModelName.setText(savedModel)
+
+        // Save on change - 使用扩展函数简化代码
+        binding.etApiAddress.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_API_ADDRESS) {
+            AiRecognizer.api = it
+        }
+        binding.etApiKey.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_API_KEY) {
+            AiRecognizer.apikey = it
+        }
+        binding.etModelName.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_MODEL_NAME) {
+            AiRecognizer.model = it
+        }
+
+        // 设置 BottomNavigationView 的监听器
+        binding.bottomNav.setOnItemSelectedListener { item ->
+            if (binding.bottomNav.selectedItemId == item.itemId) {
+                return@setOnItemSelectedListener true
+            }
+
+            when (item.itemId) {
+                R.id.navigation_home -> {
+                    switchPage(binding.pageHome, binding.pageSetting)
+                    true
+                }
+
+                R.id.navigation_settings -> {
+                    switchPage(binding.pageSetting, binding.pageHome)
+                    true
+                }
+
+                else -> false
+            }
+        }
+
+        askNotificationPermission()
+
+        // 处理 Intent，确定是否需要跳转到特定页面
+        val targetPage = intent.getStringExtra(EXTRA_TARGET_PAGE)
+        if (targetPage == TARGET_PAGE_SETTING) {
+            // 如果 Intent 要求显示设置页，则切换到设置页
+            binding.bottomNav.selectedItemId = R.id.navigation_settings
+            // 手动同步页面状态
+            binding.pageHome.visibility = View.GONE
+            binding.pageHome.alpha = 0f
+            binding.pageSetting.visibility = View.VISIBLE
+            binding.pageSetting.alpha = 1f
+
+            toast(getString(R.string.toast_enable_accessibility))
+            intent.removeExtra(EXTRA_TARGET_PAGE)
+        } else if (savedInstanceState == null) {
+            // 只有在首次启动（非重建）且没有特定目标时，才默认显示主页
+            // 如果 savedInstanceState != null，说明是重建（如权限变更），
+            // 此时应等待 onRestoreInstanceState 恢复状态，不要强制覆盖
+            binding.bottomNav.selectedItemId = R.id.navigation_home
+            // 手动同步页面状态
+            binding.pageHome.visibility = View.VISIBLE
+            binding.pageHome.alpha = 1f
+            binding.pageSetting.visibility = View.GONE
+            binding.pageSetting.alpha = 0f
+        }
+
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val selectedId = binding.bottomNav.selectedItemId
+
+                    if (selectedId != R.id.navigation_home) {
+                        binding.bottomNav.selectedItemId = R.id.navigation_home
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        )
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        // Activity 重建（如权限变更）导致状态恢复后，手动同步页面可见性
+        // 此时 BottomNavigationView 已经恢复了选中的 Item
+        when (binding.bottomNav.selectedItemId) {
+            R.id.navigation_settings -> {
+                binding.pageHome.visibility = View.GONE
+                binding.pageHome.alpha = 0f
+                binding.pageSetting.visibility = View.VISIBLE
+                binding.pageSetting.alpha = 1f
+            }
+
+            else -> {
+                binding.pageHome.visibility = View.VISIBLE
+                binding.pageHome.alpha = 1f
+                binding.pageSetting.visibility = View.GONE
+                binding.pageSetting.alpha = 0f
+            }
+        }
+    }
+
+    private fun switchPage(show: View, hide: View) {
+        show.animate().cancel()
+        hide.animate().cancel()
+
+        show.animate().setListener(null)
+        show.visibility = View.VISIBLE
+        show.animate().alpha(1f).setDuration(200).start()
+
+        hide.animate()
+            .alpha(0f)
+            .setDuration(200)
+            .withEndAction {
+                // 只有动画真正执行结束时才隐藏
+                hide.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                updateNotificationStatus()
+            } else if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            updateNotificationStatus()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 每次返回App时，都检查服务的状态
+        updateServiceStatus()
+        updateNotificationStatus()
+    }
+
+    // 处理 Activity 已存在于后台并被拉起的情况
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // 更新当前的 intent
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        val target = intent.getStringExtra(EXTRA_TARGET_PAGE)
+        if (target == TARGET_PAGE_SETTING) {
+            binding.bottomNav.selectedItemId = R.id.navigation_settings
+            toast(getString(R.string.toast_enable_accessibility))
+            // 建议：处理完后清除 Extra，避免旋转屏幕等操作重复触发
+            intent.removeExtra(EXTRA_TARGET_PAGE)
+        }
+    }
+
+    private fun updateServiceStatus() {
+        if (isAccessibilityServiceEnabled()) {
+            binding.tvAccessibilityStatus.text = getString(R.string.status_enabled)
+            binding.tvAccessibilityStatus.setTextColor(
+                ContextCompat.getColor(this, R.color.textSecondary)
+            )
+        } else {
+            binding.tvAccessibilityStatus.text = getString(R.string.status_disabled)
+            binding.tvAccessibilityStatus.setTextColor(Color.RED)
+        }
+    }
+
+    private fun updateNotificationStatus() {
+        val isGranted =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true // Pre-Tiramisu assumes granted or handled differently
+            }
+
+        if (isGranted) {
+            binding.tvNotificationStatus.text = getString(R.string.status_enabled)
+            binding.tvNotificationStatus.setTextColor(
+                ContextCompat.getColor(this, R.color.textSecondary)
+            )
+        } else {
+            binding.tvNotificationStatus.text = getString(R.string.status_disabled)
+            binding.tvNotificationStatus.setTextColor(Color.RED)
+        }
+    }
+
+    /** 检查无障碍服务是否已启用 */
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        return isAccessibilityServiceEnabled(ScreenshotAccessibilityService::class.java)
+    }
+
+    private fun showNotificationPermissionDialog() {
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(getString(R.string.dialog_notification_permission_title))
+            .setMessage(getString(R.string.dialog_notification_permission_message))
+            .setPositiveButton(getString(R.string.action_settings)) { _, _ ->
+                val intent =
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    }
+                startActivity(intent)
+            }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.notification_settings)
+            .show()
+    }
+
+    /** 显示重新发送通知确认对话框 */
+    private fun showResendConfirmDialog(result: RecognizerResult) {
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(getString(R.string.dialog_resend_title))
+            .setMessage(getString(R.string.dialog_resend_message))
+            .setPositiveButton(getString(R.string.action_send)) { _, _ ->
+                NotificationHandler.sendNotification(this, result)
+                toast(getString(R.string.toast_resent))
+            }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.notifications_unread)
+            .show()
+    }
+
+    /** 显示删除确认对话框 */
+    private fun showDeleteConfirmDialog(result: RecognizerResult) {
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(getString(R.string.dialog_delete_title))
+            .setMessage(getString(R.string.dialog_delete_message))
+            .setPositiveButton(getString(R.string.action_delete)) { _, _ ->
+                NotificationHandler.deleteHistoryItem(this, result)
+                toast(getString(R.string.toast_deleted))
+            }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.delete_forever)
+            .show()
+    }
+}

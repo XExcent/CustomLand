@@ -1,0 +1,63 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.CustomLand" parent="Theme.Material3Expressive.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/theme</item>
+        <item name="colorOnPrimary">@color/background</item>
+        <item name="colorSecondary">@color/theme</item>
+        <item name="colorOnSecondary">@color/background</item>
+        <item name="colorSurface">@color/background</item>
+        <item name="colorOnSurface">@color/textPrimary</item>
+        <item name="colorOnBackground">@color/textPrimary</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+
+        <!-- <item name="colorPrimaryContainer">@color/md_theme_primaryContainer</item> -->
+        <!-- <item name="colorOnPrimaryContainer">@color/md_theme_onPrimaryContainer</item> -->
+        <!-- <item name="colorSecondaryContainer">@color/md_theme_secondaryContainer</item> -->
+        <!-- <item name="colorOnSecondaryContainer">@color/md_theme_onSecondaryContainer</item> -->
+        <!-- <item name="colorTertiary">@color/md_theme_tertiary</item> -->
+        <!-- <item name="colorOnTertiary">@color/md_theme_onTertiary</item> -->
+        <!-- <item name="colorTertiaryContainer">@color/md_theme_tertiaryContainer</item> -->
+        <!-- <item name="colorOnTertiaryContainer">@color/md_theme_onTertiaryContainer</item> -->
+        <!-- <item name="colorError">@color/md_theme_error</item> -->
+        <!-- <item name="colorOnError">@color/md_theme_onError</item> -->
+        <!-- <item name="colorErrorContainer">@color/md_theme_errorContainer</item> -->
+        <!-- <item name="colorOnErrorContainer">@color/md_theme_onErrorContainer</item> -->
+        <!-- <item name="colorSurfaceVariant">@color/md_theme_surfaceVariant</item> -->
+        <!-- <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item> -->
+        <!-- <item name="colorOutline">@color/md_theme_outline</item> -->
+        <!-- <item name="colorOutlineVariant">@color/md_theme_outlineVariant</item> -->
+        <!-- <item name="colorSurfaceDim">@color/md_theme_surfaceDim</item> -->
+        <!-- <item name="colorSurfaceBright">@color/md_theme_surfaceBright</item> -->
+        <!-- <item name="colorSurfaceContainerLowest">@color/md_theme_surfaceContainerLowest</item> -->
+        <!-- <item name="colorSurfaceContainerLow">@color/md_theme_surfaceContainerLow</item> -->
+        <!-- <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item> -->
+        <!-- <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item> -->
+        <!-- <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item> -->
+    </style>
+
+    <style name="Theme.CustomLand" parent="Base.Theme.CustomLand" />
+
+    <style name="MyItemActiveIndicatorStyle" parent="Widget.Material3Expressive.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/theme20</item>
+    </style>
+
+    <style name="MyDialogTheme" parent="ThemeOverlay.Material3Expressive.MaterialAlertDialog.Centered">
+        <item name="android:background">@color/background</item>
+        <item name="buttonBarPositiveButtonStyle">@style/DialogFilledButton</item>
+        <item name="materialAlertDialogTitleIconStyle">@style/DialogIconStyle</item>
+    </style>
+
+    <style name="DialogFilledButton" parent="Widget.Material3Expressive.Button">
+        <item name="android:minWidth">64dp</item>
+        <item name="android:layout_marginLeft">8dp</item>
+        <item name="android:layout_marginStart">8dp</item>
+    </style>
+
+    <style name="DialogIconStyle" parent="@style/MaterialAlertDialog.Material3.Title.Icon.CenterStacked">
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_width">48dp</item>
+    </style>
+</resources>

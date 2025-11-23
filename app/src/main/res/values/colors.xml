@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="theme">#57A2DB</color>
+    <color name="background">#FFFFFF</color>
+    <color name="blurOverlay">#CCFFFFFF</color>
+    <color name="textPrimary">#DE000000</color>
+    <color name="textSecondary">#99000000</color>
+    <color name="textTertiary">#61000000</color>
+
+    <color name="container">#0D000000</color>
+
+    <color name="theme20">#3357A2DB</color>
+    <color name="theme40">#6657A2DB</color>
+</resources>
