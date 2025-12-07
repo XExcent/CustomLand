@@ -39,8 +39,19 @@ class ScreenshotAccessibilityService : AccessibilityService() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == ACTION_TAKE_SCREENSHOT) {
                     logDebug("收到截图广播")
-                    closeNotificationShade()
-                    mainHandler.postDelayed({ takeScreenshotInternal() }, SCREENSHOT_DELAY_MS)
+
+                    // 只有从磁贴触发时才关闭通知栏
+                    val fromTile = intent.getBooleanExtra("FROM_TILE", false)
+                    if (fromTile) {
+                        closeNotificationShade()
+                        mainHandler.postDelayed(
+                            { takeScreenshotInternal() },
+                            SCREENSHOT_DELAY_MS
+                        )
+                    } else {
+                        // 其他方式触发，不需要延迟和关闭通知栏
+                        takeScreenshotInternal()
+                    }
                 }
             }
         }

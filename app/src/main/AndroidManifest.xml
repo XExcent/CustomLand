@@ -36,6 +36,21 @@
             android:name=".DetailActivity"
             android:exported="false" />
 
+        <!-- 触发器 Activity - 允许其他应用调起截图识别 -->
+        <activity
+            android:name=".TriggerActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Transparent"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:label="截图识别">
+            <intent-filter>
+                <!-- 自定义 action，其他应用可以通过此 action 调起 -->
+                <action android:name="com.mukapp.customland.TRIGGER_SCREENSHOT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- 快捷磁贴服务 -->
         <service
             android:name=".service.ScreenshotTileService"

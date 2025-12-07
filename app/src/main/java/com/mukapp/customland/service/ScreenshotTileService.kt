@@ -58,7 +58,11 @@ class ScreenshotTileService : TileService() {
         }
 
         // 发送广播以触发无障碍服务中的截图
-        val intent = Intent(ACTION_TAKE_SCREENSHOT).apply { setPackage(packageName) }
+        val intent =
+            Intent(ACTION_TAKE_SCREENSHOT).apply {
+                setPackage(packageName)
+                putExtra("FROM_TILE", true) // 标记这是从磁贴触发的，需要关闭通知栏
+            }
         sendBroadcast(intent)
     }
 
