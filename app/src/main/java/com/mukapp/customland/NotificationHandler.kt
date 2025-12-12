@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.drawable.Icon
-import android.os.Bundle
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
@@ -15,13 +14,12 @@ import com.dylanc.longan.logError
 import com.mukapp.customland.Constants.MAX_HISTORY_SIZE
 import com.mukapp.customland.Constants.PREF_HISTORY_JSON
 import com.mukapp.customland.Constants.PREF_NOTIFICATION_HISTORY
+import com.xzakota.hyper.notification.focus.FocusNotification
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** 通知处理器 根据你提供的PDF文档，检查是否为 HyperOS 3，并相应地发送岛通知或普通通知。 */
 object NotificationHandler {
@@ -144,6 +142,21 @@ object NotificationHandler {
         }
     }
 
+    /** 构建通知文本 */
+    private fun buildNotificationText(result: RecognizerResult): String = buildString {
+        if (result.content.isNotEmpty()) {
+            append(result.content)
+        }
+        if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
+            if (isNotEmpty()) append("\n")
+            append("${result.infoContent}：${result.infoTitle}")
+        }
+        if (result.subInfoTitle.isNotEmpty() && result.subInfoContent.isNotEmpty()) {
+            if (isNotEmpty()) append("\n")
+            append("${result.subInfoContent}：${result.subInfoTitle}")
+        }
+    }
+
     /** 构建标准通知 */
     private fun buildStandardNotification(
         context: Context,
@@ -155,26 +168,7 @@ object NotificationHandler {
                 .setSmallIcon(R.drawable.wand_stars)
                 .setContentTitle(result.title)
                 .setOngoing(true)
-        val notificationText = buildString {
-            // 1. 添加 content，如果它不为空
-            if (result.content.isNotEmpty()) {
-                append(result.content)
-            }
-            // 2. 添加 infotitle 和 infocontent，仅当两者都不为空时
-            if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
-                if (isNotEmpty()) {
-                    append("\n") // 如果前面有内容，则换行
-                }
-                append("${result.infoContent}：${result.infoTitle}")
-            }
-            // 3. 添加 subinfotitle 和 subinfocontent，仅当两者都不为空时
-            if (result.subInfoTitle.isNotEmpty() && result.subInfoContent.isNotEmpty()) {
-                if (isNotEmpty()) {
-                    append("\n") // 如果前面有内容，则换行
-                }
-                append("${result.subInfoContent}：${result.subInfoTitle}")
-            }
-        }
+        val notificationText = buildNotificationText(result)
         if (notificationText.isNotEmpty()) {
             builder.setContentText(notificationText)
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
@@ -187,191 +181,109 @@ object NotificationHandler {
         context: Context,
         result: RecognizerResult
     ): Notification {
+        // 使用 HyperNotification 库构建焦点通知
+        val extras =
+            FocusNotification.buildV3 {
+                val iconLight =
+                    createPicture(
+                        "pic_icon_light",
+                        Icon.createWithResource(context, R.drawable.wand_stars)
+                            .setTint("#FFFFFF".toColorInt())
+                    )
+                val iconDark =
+                    createPicture(
+                        "pic_icon_dark",
+                        Icon.createWithResource(context, R.drawable.wand_stars)
+                            .setTint("#424242".toColorInt())
+                    )
+
+                enableFloat = true
+                ticker =
+                    if (result.content.isNotEmpty()) {
+                        "${result.content} ${result.title}"
+                    } else {
+                        result.title
+                    }
+                tickerPic = iconLight
+
+                // 基础信息
+                if (result.content.isNotEmpty()) {
+                    baseInfo {
+                        type = 1
+                        title = result.title
+                        content = result.content
+                        colorTitle = "#57A2DB"
+                    }
+                }
+
+                // 提示信息
+                if ((result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) ||
+                    (result.subInfoTitle.isNotEmpty() &&
+                            result.subInfoContent.isNotEmpty())
+                ) {
+                    hintInfo {
+                        type = 2
+                        if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
+                            title = result.infoTitle
+                            content = result.infoContent
+                        }
+                        if (result.subInfoTitle.isNotEmpty() &&
+                            result.subInfoContent.isNotEmpty()
+                        ) {
+                            subTitle = result.subInfoTitle
+                            subContent = result.subInfoContent
+                        }
+                    }
+                }
+
+                // 超级岛配置
+                island {
+                    islandProperty = 1
+                    bigIslandArea {
+                        imageTextInfoLeft {
+                            type = 1
+                            if (result.content.isNotEmpty()) {
+                                textInfo { title = result.content }
+                            }
+                            picInfo {
+                                type = 1
+                                pic = iconLight
+                            }
+                        }
+                        textInfo =
+                            com.xzakota.hyper.notification.island.model.TextInfo().apply {
+                                title = result.title
+                            }
+                    }
+                    shareData {
+                        title = result.title
+                        if (result.content.isNotEmpty()) {
+                            content = result.content
+                            shareContent = "${result.content}：${result.title}"
+                        } else {
+                            shareContent = result.title
+                        }
+                    }
+                }
+            }
+
+        // 构建通知
+        val notificationText = buildNotificationText(result)
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
                 .setContentTitle(result.title)
                 .setOngoing(true)
-        val notificationText = buildString {
-            // 1. 添加 content，如果它不为空
-            if (result.content.isNotEmpty()) {
-                append(result.content)
-            }
-            // 2. 添加 infotitle 和 infocontent，仅当两者都不为空时
-            if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
-                if (isNotEmpty()) {
-                    append("\n") // 如果前面有内容，则换行
-                }
-                append("${result.infoContent}：${result.infoTitle}")
-            }
-            // 3. 添加 subinfotitle 和 subinfocontent，仅当两者都不为空时
-            if (result.subInfoTitle.isNotEmpty() && result.subInfoContent.isNotEmpty()) {
-                if (isNotEmpty()) {
-                    append("\n") // 如果前面有内容，则换行
-                }
-                append("${result.subInfoContent}：${result.subInfoTitle}")
-            }
-        }
+
         if (notificationText.isNotEmpty()) {
             builder.setContentText(notificationText)
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
         }
-        builder.extras.putString("miui.focus.param", createIslandParamsJson(result))
 
-        builder.extras.putBundle(
-            "miui.focus.pics",
-            Bundle().apply {
-                putParcelable(
-                    "miui.focus.pic_icon_light",
-                    Icon.createWithResource(context, R.drawable.wand_stars)
-                        .setTint("#FFFFFF".toColorInt())
-                )
-                putParcelable(
-                    "miui.focus.pic_icon_light_secondary",
-                    Icon.createWithResource(context, R.drawable.wand_stars)
-                        .setTint("#9E9E9E".toColorInt())
-                )
-                putParcelable(
-                    "miui.focus.pic_icon_dark",
-                    Icon.createWithResource(context, R.drawable.wand_stars)
-                        .setTint("#424242".toColorInt())
-                )
-            }
-        )
+        builder.extras.putAll(extras)
 
         logDebug("创建 HyperOS Island 通知成功")
-
         return builder.build()
-    }
-
-    fun createIslandParamsJson(result: RecognizerResult): String {
-        // 使用 buildJsonObject 动态构建
-        val jsonObject = buildJsonObject {
-            put(
-                "param_v2",
-                buildJsonObject {
-                    put("protocol", 1)
-                    // put("business", "taxi")
-                    put("enableFloat", true)
-                    put("updatable", true)
-                    put("reopen", "reopen")
-
-                    // Ticker: 只有 text 不为空时才拼接
-                    val tickerText =
-                        if (result.content.isNotEmpty()) "${result.content} ${result.title}"
-                        else result.title
-                    put("ticker", tickerText)
-                    put("aodTitle", result.title)
-                    put("aodPic", "miui.focus.pic_icon_light")
-
-                    put(
-                        "param_island",
-                        buildJsonObject {
-                            put("islandProperty", 1)
-                            put(
-                                "bigIslandArea",
-                                buildJsonObject {
-                                    // 只有 text 不为空时才添加 imageTextInfoLeft
-                                    put(
-                                        "imageTextInfoLeft",
-                                        buildJsonObject {
-                                            put("type", 1)
-                                            if (result.content.isNotEmpty()) {
-                                                put(
-                                                    "textInfo",
-                                                    buildJsonObject {
-                                                        put(
-                                                            "title",
-                                                            result.content
-                                                        )
-                                                    }
-                                                )
-                                            }
-                                            put(
-                                                "picInfo",
-                                                buildJsonObject {
-                                                    put("type", 1)
-                                                    put(
-                                                        "pic",
-                                                        "miui.focus.pic_icon_light"
-                                                    )
-                                                }
-                                            )
-                                        }
-                                    )
-                                    put(
-                                        "textInfo",
-                                        buildJsonObject {
-                                            put("title", result.title)
-                                        }
-                                    )
-                                }
-                            )
-                            put(
-                                "shareData",
-                                buildJsonObject {
-                                    put("title", result.title)
-                                    if (result.content.isNotEmpty()) {
-                                        put("content", result.content)
-                                        put(
-                                            "shareContent",
-                                            "${result.content}：${result.title}"
-                                        )
-                                    } else {
-                                        put("shareContent", result.title)
-                                    }
-                                }
-                            )
-                        }
-                    )
-
-                    if (result.content.isNotEmpty()) {
-                        put(
-                            "baseInfo",
-                            buildJsonObject {
-                                put("type", 1)
-                                put("title", result.title)
-                                put("content", result.content)
-                                put("colorTitle", "#57A2DB")
-                            }
-                        )
-                    }
-                    if ((result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) ||
-                        (result.subInfoTitle.isNotEmpty() &&
-                                result.subInfoContent.isNotEmpty())
-                    ) {
-                        put(
-                            "hintInfo",
-                            buildJsonObject {
-                                put("type", 2)
-                                if (result.infoTitle.isNotEmpty() &&
-                                    result.infoContent.isNotEmpty()
-                                ) {
-                                    put("title", result.infoTitle)
-                                    put("content", result.infoContent)
-                                }
-                                if (result.subInfoTitle.isNotEmpty() &&
-                                    result.subInfoContent.isNotEmpty()
-                                ) {
-                                    put("subTitle", result.subInfoTitle)
-                                    put("subContent", result.subInfoContent)
-                                }
-                            }
-                        )
-                    }
-                    put(
-                        "picInfo",
-                        buildJsonObject {
-                            put("type", 1)
-                            put("pic", "miui.focus.pic_icon_dark")
-                            put("picDark", "miui.focus.pic_icon_light_secondary")
-                        }
-                    )
-                }
-            )
-        }
-
-        return jsonObject.toString()
     }
 
     suspend fun saveHistory(context: Context) {

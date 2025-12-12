@@ -47,19 +47,20 @@ android {
 // noinspection GradleDynamicVersion
 dependencies {
     // AndroidX / Google
-    implementation("androidx.core:core-ktx:_")
-    implementation("androidx.appcompat:appcompat:_")
-    implementation("com.google.android.material:material:_")
-    implementation("androidx.activity:activity:_")
-    implementation("androidx.constraintlayout:constraintlayout:_")
+    implementation(AndroidX.core.ktx)
+    implementation(AndroidX.appCompat)
+    implementation(Google.android.material)
+    implementation(AndroidX.activity)
+    implementation(AndroidX.constraintLayout)
 
     // Test
-    testImplementation("junit:junit:_")
-    androidTestImplementation("androidx.test.ext:junit:_")
-    androidTestImplementation("androidx.test.espresso:espresso-core:_")
+    testImplementation(Testing.junit4)
+    androidTestImplementation(AndroidX.test.ext.junit)
+    androidTestImplementation(AndroidX.test.espresso.core)
 
     // Third Party
     implementation("com.github.DylanCaiCoding.Longan:longan:_")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:_")
+    implementation(KotlinX.serialization.json)
     implementation("com.github.Dimezis:BlurView:_")
+    implementation("com.xzakota.hyper.notification:focus-api:_")
 }
