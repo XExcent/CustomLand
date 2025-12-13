@@ -5,7 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.drawable.Icon
+import android.os.Bundle
 import android.provider.Settings
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
@@ -14,12 +16,13 @@ import com.dylanc.longan.logError
 import com.mukapp.customland.Constants.MAX_HISTORY_SIZE
 import com.mukapp.customland.Constants.PREF_HISTORY_JSON
 import com.mukapp.customland.Constants.PREF_NOTIFICATION_HISTORY
-import com.xzakota.hyper.notification.focus.FocusNotification
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** 通知处理器 根据你提供的PDF文档，检查是否为 HyperOS 3，并相应地发送岛通知或普通通知。 */
 object NotificationHandler {
@@ -181,109 +184,270 @@ object NotificationHandler {
         context: Context,
         result: RecognizerResult
     ): Notification {
-        // 使用 HyperNotification 库构建焦点通知
-        val extras =
-            FocusNotification.buildV3 {
-                val iconLight =
-                    createPicture(
-                        "pic_icon_light",
-                        Icon.createWithResource(context, R.drawable.wand_stars)
-                            .setTint("#FFFFFF".toColorInt())
-                    )
-                val iconDark =
-                    createPicture(
-                        "pic_icon_dark",
-                        Icon.createWithResource(context, R.drawable.wand_stars)
-                            .setTint("#424242".toColorInt())
-                    )
-
-                enableFloat = true
-                ticker =
-                    if (result.content.isNotEmpty()) {
-                        "${result.content} ${result.title}"
-                    } else {
-                        result.title
-                    }
-                tickerPic = iconLight
-
-                // 基础信息
-                if (result.content.isNotEmpty()) {
-                    baseInfo {
-                        type = 1
-                        title = result.title
-                        content = result.content
-                        colorTitle = "#57A2DB"
-                    }
-                }
-
-                // 提示信息
-                if ((result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) ||
-                    (result.subInfoTitle.isNotEmpty() &&
-                            result.subInfoContent.isNotEmpty())
-                ) {
-                    hintInfo {
-                        type = 2
-                        if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
-                            title = result.infoTitle
-                            content = result.infoContent
-                        }
-                        if (result.subInfoTitle.isNotEmpty() &&
-                            result.subInfoContent.isNotEmpty()
-                        ) {
-                            subTitle = result.subInfoTitle
-                            subContent = result.subInfoContent
-                        }
-                    }
-                }
-
-                // 超级岛配置
-                island {
-                    islandProperty = 1
-                    bigIslandArea {
-                        imageTextInfoLeft {
-                            type = 1
-                            if (result.content.isNotEmpty()) {
-                                textInfo { title = result.content }
-                            }
-                            picInfo {
-                                type = 1
-                                pic = iconLight
-                            }
-                        }
-                        textInfo =
-                            com.xzakota.hyper.notification.island.model.TextInfo().apply {
-                                title = result.title
-                            }
-                    }
-                    shareData {
-                        title = result.title
-                        if (result.content.isNotEmpty()) {
-                            content = result.content
-                            shareContent = "${result.content}：${result.title}"
-                        } else {
-                            shareContent = result.title
-                        }
-                    }
-                }
-            }
-
-        // 构建通知
-        val notificationText = buildNotificationText(result)
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
                 .setContentTitle(result.title)
                 .setOngoing(true)
-
+        val notificationText = buildNotificationText(result)
         if (notificationText.isNotEmpty()) {
             builder.setContentText(notificationText)
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
         }
+        // 自定义布局需要使用 miui.focus.param.custom 而不是 miui.focus.param
+        val customParamsJson = createCustomParamsJson(result)
+        logDebug("customParamsJson: $customParamsJson")
+        builder.extras.putString("miui.focus.param.custom", customParamsJson)
+        // 同时添加 ticker 用于状态栏显示
+        builder.extras.putString("miui.focus.ticker", result.title)
 
-        builder.extras.putAll(extras)
+        builder.extras.putBundle(
+            "miui.focus.pics",
+            Bundle().apply {
+                putParcelable(
+                    "miui.focus.pic_icon_light",
+                    Icon.createWithResource(context, R.drawable.wand_stars)
+                        .setTint("#FFFFFF".toColorInt())
+                )
+                putParcelable(
+                    "miui.focus.pic_icon_light_secondary",
+                    Icon.createWithResource(context, R.drawable.wand_stars)
+                        .setTint("#9E9E9E".toColorInt())
+                )
+                putParcelable(
+                    "miui.focus.pic_icon_dark",
+                    Icon.createWithResource(context, R.drawable.wand_stars)
+                        .setTint("#424242".toColorInt())
+                )
+            }
+        )
 
-        logDebug("创建 HyperOS Island 通知成功")
+        // 添加自定义布局
+        builder.extras.putParcelable(
+            "miui.focus.rv",
+            createFocusRemoteViews(context, result, isDarkMode = false)
+        )
+        builder.extras.putParcelable(
+            "miui.focus.rvNight",
+            createFocusRemoteViews(context, result, isDarkMode = true)
+        )
+        // 超级岛展开状态布局（使用暗色模式）
+        builder.extras.putParcelable(
+            "miui.focus.rv.island.expand",
+            createFocusRemoteViews(context, result, isDarkMode = true)
+        )
+
+        logDebug("创建 HyperOS Island 自定义通知成功")
+
         return builder.build()
+    }
+
+    /**
+     * 创建自定义焦点通知参数 JSON（用于 miui.focus.param.custom） 注意：自定义 RemoteViews 需要使用此格式，直接是 param_v2
+     * 的内容，无需外层包装
+     */
+    private fun createCustomParamsJson(result: RecognizerResult): String {
+        val tickerText =
+            if (result.content.isNotEmpty()) "${result.content} ${result.title}"
+            else result.title
+
+        val jsonObject = buildJsonObject {
+            put("protocol", 1)
+            put("enableFloat", true)
+            put("updatable", true)
+            put("isShowNotification", true)
+            put("ticker", tickerText)
+            put("tickerPic", "miui.focus.pic_icon_light")
+            put("tickerPicDark", "miui.focus.pic_icon_dark")
+            put("timeout", 999999)
+            put("reopen", "reopen")
+
+            // 息屏显示配置
+            put("aodTitle", result.title)
+            put("aodPic", "miui.focus.pic_icon_light")
+
+            // 小米超级岛配置
+            put(
+                "param_island",
+                buildJsonObject {
+                    put("islandProperty", 1)
+                    put("islandPriority", 2)
+                    put("islandTimeout", 280)
+                    put("dismissIsland", false)
+                    put("needCloseAnimation", true)
+
+                    // 未展开态（小岛/胶囊态）
+                    put(
+                        "smallIslandArea",
+                        buildJsonObject {
+                            put(
+                                "picInfo",
+                                buildJsonObject {
+                                    put("type", 1)
+                                    put("pic", "miui.focus.pic_icon_light")
+                                }
+                            )
+                        }
+                    )
+
+                    // 展开态（大岛）
+                    put(
+                        "bigIslandArea",
+                        buildJsonObject {
+                            put(
+                                "imageTextInfoLeft",
+                                buildJsonObject {
+                                    put("type", 1)
+                                    if (result.content.isNotEmpty()) {
+                                        put(
+                                            "textInfo",
+                                            buildJsonObject {
+                                                put("title", result.content)
+                                            }
+                                        )
+                                    }
+                                    put(
+                                        "picInfo",
+                                        buildJsonObject {
+                                            put("type", 1)
+                                            put("pic", "miui.focus.pic_icon_light")
+                                        }
+                                    )
+                                }
+                            )
+                            put(
+                                "imageTextInfoRight",
+                                buildJsonObject {
+                                    put("type", 2)
+                                    put(
+                                        "textInfo",
+                                        buildJsonObject {
+                                            put("title", result.title)
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    )
+
+                    // 分享数据
+                    put(
+                        "shareData",
+                        buildJsonObject {
+                            put("title", result.title)
+                            put("pic", "miui.focus.pic_icon_light")
+                            if (result.content.isNotEmpty()) {
+                                put("content", result.content)
+                                put("shareContent", "${result.content}：${result.title}")
+                            } else {
+                                put("shareContent", result.title)
+                            }
+                        }
+                    )
+                }
+            )
+        }
+
+        return jsonObject.toString()
+    }
+
+    /** 创建普通焦点通知参数 JSON（用于 miui.focus.param，不使用自定义布局时） 保留此函数以备不使用自定义 RemoteViews 时使用 */
+    fun createIslandParamsJson(result: RecognizerResult): String {
+        val jsonObject = buildJsonObject {
+            put(
+                "param_v2",
+                buildJsonObject {
+                    put("protocol", 1)
+                    put("enableFloat", true)
+                    put("updatable", true)
+                    put("reopen", "reopen")
+
+                    val tickerText =
+                        if (result.content.isNotEmpty()) "${result.content} ${result.title}"
+                        else result.title
+                    put("ticker", tickerText)
+                    put("aodTitle", result.title)
+                    put("aodPic", "miui.focus.pic_icon_light")
+
+                    put(
+                        "param_island",
+                        buildJsonObject {
+                            put("islandProperty", 1)
+                            put(
+                                "bigIslandArea",
+                                buildJsonObject {
+                                    put(
+                                        "imageTextInfoLeft",
+                                        buildJsonObject {
+                                            put("type", 1)
+                                            if (result.content.isNotEmpty()) {
+                                                put(
+                                                    "textInfo",
+                                                    buildJsonObject {
+                                                        put(
+                                                            "title",
+                                                            result.content
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                            put(
+                                                "picInfo",
+                                                buildJsonObject {
+                                                    put("type", 1)
+                                                    put(
+                                                        "pic",
+                                                        "miui.focus.pic_icon_light"
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    )
+                                    put(
+                                        "imageTextInfoRight",
+                                        buildJsonObject {
+                                            put("type", 2)
+                                            put(
+                                                "textInfo",
+                                                buildJsonObject {
+                                                    put("title", result.title)
+                                                }
+                                            )
+                                        }
+                                    )
+                                }
+                            )
+                            put(
+                                "shareData",
+                                buildJsonObject {
+                                    put("title", result.title)
+                                    if (result.content.isNotEmpty()) {
+                                        put("content", result.content)
+                                        put(
+                                            "shareContent",
+                                            "${result.content}：${result.title}"
+                                        )
+                                    } else {
+                                        put("shareContent", result.title)
+                                    }
+                                }
+                            )
+                        }
+                    )
+
+                    put(
+                        "picInfo",
+                        buildJsonObject {
+                            put("type", 1)
+                            put("pic", "miui.focus.pic_icon_dark")
+                            put("picDark", "miui.focus.pic_icon_light_secondary")
+                        }
+                    )
+                }
+            )
+        }
+
+        return jsonObject.toString()
     }
 
     suspend fun saveHistory(context: Context) {
@@ -335,6 +499,52 @@ object NotificationHandler {
             saveHistory(context)
         }
         onHistoryUpdated?.invoke()
+    }
+
+    /** 创建焦点通知 RemoteViews 自定义布局 */
+    private fun createFocusRemoteViews(
+        context: Context,
+        result: RecognizerResult,
+        isDarkMode: Boolean
+    ): RemoteViews {
+        val layoutId =
+            if (isDarkMode) {
+                R.layout.layout_focus_custom_night
+            } else {
+                R.layout.layout_focus_custom
+            }
+
+        return RemoteViews(context.packageName, layoutId).apply {
+            // 设置图标
+            setImageViewResource(R.id.ivIcon, R.drawable.wand_stars)
+
+            // 上半部分：标签(content) + 主要内容(title)
+            setTextViewText(R.id.tvLabel, result.content.ifEmpty { "识别结果" })
+            setTextViewText(R.id.tvMainContent, result.title)
+
+            // 下半部分：描述文字
+            val description = buildString {
+                if (result.infoTitle.isNotEmpty()) {
+                    append(result.infoTitle)
+                    if (result.infoContent.isNotEmpty()) {
+                        append(" · ")
+                        append(result.infoContent)
+                    }
+                }
+                if (result.subInfoTitle.isNotEmpty()) {
+                    if (isNotEmpty()) append("\n")
+                    append(result.subInfoTitle)
+                    if (result.subInfoContent.isNotEmpty()) {
+                        append(" · ")
+                        append(result.subInfoContent)
+                    }
+                }
+            }
+            setTextViewText(R.id.tvDescription, description.ifEmpty { "CustomLand" })
+
+            // 按钮文字
+            setTextViewText(R.id.btnAction, "查看")
+        }
     }
 
     /** 删除截图文件 */
