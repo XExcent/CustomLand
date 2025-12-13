@@ -149,8 +149,8 @@ class DetailActivity : AppCompatActivity() {
             cardError.visibility = View.VISIBLE
             // 限制错误信息长度，防止超长文本
             val displayMessage =
-                if (errorMessage.length > 1000) {
-                    errorMessage.take(1000) + "\n\n... (错误信息过长已截断)"
+                if (errorMessage.length > 3000) {
+                    errorMessage.take(3000) + "\n\n... (错误信息过长已截断)"
                 } else {
                     errorMessage
                 }
@@ -185,7 +185,7 @@ class DetailActivity : AppCompatActivity() {
     /** 格式化JSON字符串 */
     private fun formatJson(json: String): String {
         // 限制长度，防止超长文本导致渲染卡死
-        val maxLength = 10000
+        val maxLength = 3000
         val truncated =
             if (json.length > maxLength) {
                 json.take(maxLength) + "\n\n... (内容过长已截断，总长度: ${json.length} 字符)"

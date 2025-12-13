@@ -1,4 +1,4 @@
-package com.mukapp.customland
+﻿package com.mukapp.customland
 
 import android.graphics.Bitmap
 import android.util.Base64
@@ -6,6 +6,7 @@ import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
+import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -15,7 +16,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
-import java.net.URL
 
 object AiRecognizer {
     var api: String = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
@@ -44,37 +44,60 @@ object AiRecognizer {
                 val promptText =
                     """
                     # Role
-                    你是一个UI信息提取助手，专门为“灵动岛”功能从图片中提取关键结构化数据。
-
-                    # Output Format
-                    必须仅返回纯 JSON 格式，不要包含 markdown 标记（如 ```json）。
-
-                    # Field Definitions (Crucial)
-                    请注意：为了适配UI显示，字段逻辑与常规不同，请严格遵守以下定义：
-                    - title (必填): **核心数据值**（视觉上最需要突出的具体信息）。例如：具体的取餐码"A808"、航班号"CA1234"、车牌号等。
-                    - content (必填): **数据值的标签/分类**（对title的简短描述）。例如："取餐码"、"航班"、"车牌"。
-                    - infoTitle: **第一优先级补充数据**。例如：具体的商家名"麦当劳"、具体的登机口"15A"。
-                    - infoContent: **第一优先级数据的标签**。例如："商家"、"登机口"。
-                    - subInfoTitle: **第二优先级补充数据**。
-                    - subInfoContent: **第二优先级数据的标签**。
-
-                    # Constraints
-                    1. 字段必须成对出现：如果有 `xxxTitle`，必须有对应的 `xxxContent`。
-                    2. 无法识别或不存在的非必填字段，必须返回空字符串 `""`，不要返回 null。
-                    3. **填写顺序严格优先**：必须先填充 `info` 组。严禁跳过 `infoTitle` 直接填充 `subInfoTitle`。只有当有一个补充信息时，必须填在 `infoTitle`；有两个补充信息时，次要的那个才填入 `subInfoTitle`。
-                    4. **字数强制限制**：`infoTitle` 和 `subInfoTitle` 的**字数总和严禁超过 12 个字**（因为UI空间极小）。如果原始内容过长，你必须进行提取、缩写或仅保留最关键的词汇（例如将“肯德基宅急送”缩写为“肯德基”）。
-
-                    # Example
-                    Input Description: 一张显示肯德基北京大学校内店取餐码为K555的截图。
-                    Output:
+                    你是一个专为“灵动岛”UI设计的各种截图信息提取专家。你的任务是从图片中提取关键信息，并将其转化为符合严格UI限制的结构化JSON数据。
+                    
+                    # Critical Constraints (最高优先级)
+                    1. **输出格式**：仅输出纯 JSON 字符串。严禁使用 ```json 代码块、Markdown 标记或任何解释性文字。
+                    2. **容错处理**：识别不到的非必填字段返回空字符串""
+                    
+                    # Extraction Rules (字段定义)
+                    请根据以下逻辑提取并映射字段：
+                    
+                    ## 1. title (String, 必填)
+                    * **定义**：用户完成线下动作所需的最核心凭证（如取餐码、取件码、座位号、登机口）。
+                    * **特征**：通常是数字、字母组合，视觉上最醒目。
+                    * **处理**：去除“取餐码”等前缀，只保留核心字符（如 "取餐码 A888" -> "A888"）。
+                    
+                    ## 2. content (String, 必填)
+                    * **定义**：title 的简短描述标签。
+                    * **限制**：严格控制在 2-4 个汉字（如：取餐码、快递柜、登机口、检票口）。
+                    
+                    ## 3. info (String, 选填)
+                    * **定义**：辅助详情。
+                    * **优先级**：核心商品/服务名 > 店铺/地点 > 备注/时间。
+                    * **格式**：使用 `\n` 换行。最多 3 行，尽量 2 行。
+                    * **长度控制**：每行不超过 12 个全角字符，太长可缩略（例如“肯德基（北京大学第三分店）” -> “肯德基(北大店)”）。
+                    
+                    ## 4. iconType (String, 枚举, 必填)
+                    根据画面主体内容，精确匹配以下枚举值之一。若不确定，优先使用泛类（如 TAKEOUT_BAG）。
+                    * **饮品类**：MILK_TEA (奶茶/果茶), COFFEE (咖啡)
+                    * **主食类**：BURGER (汉堡/西餐), FRIED_CHICKEN (炸鸡/小食), RICE_BOWL (米饭/简餐), NOODLES (面条/粉/螺蛳粉), PIZZA (披萨)
+                    * **甜品类**：DESSERT (甜品/冰淇淋), CAKE (蛋糕/面包), FRUIT (水果)
+                    * **通用/物流**：TAKEOUT_BAG (无法区分具体食物/混合外卖), PACKAGE (快递包裹/物流), SHOPPING_BAG (商超购物)
+                    * **默认**：RECEIPT (小票/排号单/其他)
+                    
+                    ## 5. buttonText (String, 必填)
+                    * **逻辑**：
+                        * 取餐/取件/核销 -> "已取"
+                        * 排队/等位 -> "不等了"
+                        * 通知/票务 -> "知道了"
+                    * **限制**：2-3 个汉字。
+                    
+                    # Output Schema
                     {
-                      "title": "K555",
-                      "content": "取餐码",
-                      "infoTitle": "肯德基",
-                      "infoContent": "商家",
-                      "subInfoTitle": "香辣鸡腿堡",
-                      "subInfoContent": "餐品"
+                      "title": "String",
+                      "content": "String",
+                      "info": "String",
+                      "iconType": "Enum String",
+                      "buttonText": "String"
                     }
+                    
+                    # Few-Shot Examples
+                    User Input: [肯德基截图: K555, 香辣鸡腿堡套餐, 北京大学北门店]
+                    Assistant Output: {"title":"K555","content":"取餐码","info":"香辣鸡腿堡套餐\n肯德基(北大北门店)","iconType":"BURGER","buttonText":"已取"}
+                    
+                    User Input: [丰巢截图: 取件码 882299, 顺丰快递]
+                    Assistant Output: {"title":"882299","content":"快递柜","info":"顺丰速运\n丰巢快递柜","iconType":"PACKAGE","buttonText":"已取"}
                 """.trimIndent()
 
                 // 2. 使用 DSL 构建 JSON
@@ -143,10 +166,15 @@ object AiRecognizer {
                     val resultJson = JSONObject(cleanedContent)
                     val title = resultJson.optString("title")
                     val content = resultJson.optString("content")
-                    val infoTitle = resultJson.optString("infoTitle")
-                    val infoContent = resultJson.optString("infoContent")
-                    val subInfoTitle = resultJson.optString("subInfoTitle")
-                    val subInfoContent = resultJson.optString("subInfoContent")
+                    val info = resultJson.optString("info")
+                    val buttonText = resultJson.optString("buttonText", "已取")
+                    val iconTypeStr = resultJson.optString("iconType", "RECEIPT")
+                    val iconType =
+                        try {
+                            IconType.valueOf(iconTypeStr)
+                        } catch (_: IllegalArgumentException) {
+                            IconType.RECEIPT // 无法识别的默认使用 RECEIPT
+                        }
 
                     val duration = System.currentTimeMillis() - startTime
                     val debugInfo =
@@ -160,10 +188,9 @@ object AiRecognizer {
                         RecognizerResult(
                             title = title,
                             content = content,
-                            infoTitle = infoTitle,
-                            infoContent = infoContent,
-                            subInfoTitle = subInfoTitle,
-                            subInfoContent = subInfoContent,
+                            info = info,
+                            iconType = iconType,
+                            buttonText = buttonText,
                             screenshotPath = screenshotPath,
                             debugInfo = debugInfo
                         )
@@ -218,9 +245,13 @@ object AiRecognizer {
 
     /** 省略JSON中的base64图片数据，避免显示时卡顿 */
     private fun omitBase64FromJson(json: String): String {
-        val regex = Regex("""(data:image/jpeg;base64,)[A-Za-z0-9+/=]{50,}""")
+        // 1. (data:image.*?;base64,) -> 捕获组1：匹配头部，不管中间是 / 还是 \/，直到遇到 ;base64,
+        // 2. ([^"]*) -> 捕获组2：匹配数据，贪婪地吃掉所有直到遇到下一个双引号字符
+        val regex = Regex("""(data:image.*?;base64,)([^"]*)""")
+
         return regex.replace(json) { matchResult ->
-            "${matchResult.groupValues[1]}......图片base64此处省略......"
+            // 保留头部(组1)，替换数据部分(组2)
+            "${matchResult.groupValues[1]}......(已省略Base64数据)......"
         }
     }
 }
@@ -228,18 +259,80 @@ object AiRecognizer {
 @Serializable
 data class DebugInfo(val requestJson: String, val responseJson: String, val durationMs: Long)
 
+/** 图标类型枚举 */
+@Serializable
+enum class IconType {
+    MILK_TEA, // 奶茶
+    COFFEE, // 咖啡
+    PIZZA, // 披萨
+    BURGER, // 汉堡套餐
+    FRIED_CHICKEN, // 炸鸡套餐
+    NOODLES, // 面
+    RICE_BOWL, // 盖饭
+    DESSERT, // 甜点
+    CAKE, // 蛋糕
+    FRUIT, // 水果
+    PACKAGE, // 快递箱
+    TAKEOUT_BAG, // 外卖袋（食物默认）
+    SHOPPING_BAG, // 购物袋
+    RECEIPT; // 小票（通用默认）
+
+    /** 获取对应的图标资源 ID */
+    fun getIconRes(): Int =
+        when (this) {
+            MILK_TEA -> R.drawable.ic_milk_tea
+            COFFEE -> R.drawable.ic_coffee
+            PIZZA -> R.drawable.ic_pizza
+            BURGER -> R.drawable.ic_burger
+            FRIED_CHICKEN -> R.drawable.ic_fried_chicken
+            NOODLES -> R.drawable.ic_noodles
+            RICE_BOWL -> R.drawable.ic_rice_bowl
+            DESSERT -> R.drawable.ic_dessert
+            CAKE -> R.drawable.ic_cake
+            FRUIT -> R.drawable.ic_fruit
+            PACKAGE -> R.drawable.ic_package
+            TAKEOUT_BAG -> R.drawable.ic_takeout_bag
+            SHOPPING_BAG -> R.drawable.ic_shopping_bag
+            RECEIPT -> R.drawable.ic_receipt
+        }
+}
+
 @Serializable
 data class RecognizerResult(
     val id: String = java.util.UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
     val title: String,
     val content: String = "",
-    val infoTitle: String = "",
-    val infoContent: String = "",
-    val subInfoTitle: String = "",
-    val subInfoContent: String = "",
+    val info: String = "", // 新字段：补充信息（支持多行）
+    val iconType: IconType = IconType.RECEIPT, // 新字段：图标类型
+    val buttonText: String = "完成", // 新字段：按钮文字
     val error: Boolean? = false,
     val errorMessage: String? = null, // 错误信息
     val screenshotPath: String? = null, // 截图保存路径
-    val debugInfo: DebugInfo? = null // 调试信息
-)
+    val debugInfo: DebugInfo? = null, // 调试信息
+
+    // 旧字段保留用于兼容（反序列化旧数据时使用）
+    @Deprecated("使用 info 字段替代") val infoTitle: String = "",
+    @Deprecated("使用 info 字段替代") val infoContent: String = "",
+    @Deprecated("使用 info 字段替代") val subInfoTitle: String = "",
+    @Deprecated("使用 info 字段替代") val subInfoContent: String = ""
+) {
+    /** 获取兼容的补充信息（优先使用新字段，否则从旧字段组合） */
+    @Suppress("DEPRECATION")
+    val compatInfo: String
+        get() = if (info.isNotEmpty()) info else buildLegacyInfo()
+
+    /** 从旧字段构建补充信息 */
+    @Suppress("DEPRECATION")
+    private fun buildLegacyInfo(): String = buildString {
+        if (infoTitle.isNotEmpty()) {
+            // if (infoContent.isNotEmpty()) append("$infoContent：")
+            append(infoTitle)
+        }
+        if (subInfoTitle.isNotEmpty()) {
+            if (isNotEmpty()) append("\n")
+            // if (subInfoContent.isNotEmpty()) append("$subInfoContent：")
+            append(subInfoTitle)
+        }
+    }
+}

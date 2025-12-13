@@ -3,8 +3,13 @@ package com.mukapp.customland
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.RemoteViews
@@ -29,7 +34,13 @@ object NotificationHandler {
 
     private const val CHANNEL_ID = "default"
     private const val CHANNEL_NAME = "默认通知渠道"
+    private const val ACTION_DISMISS_NOTIFICATION =
+        "com.mukapp.customland.ACTION_DISMISS_NOTIFICATION"
+    private const val EXTRA_NOTIFICATION_ID = "notification_id"
     private val notificationIdCounter = AtomicInteger(0)
+
+    // 广播接收器，用于处理按钮点击关闭通知
+    private var dismissReceiver: BroadcastReceiver? = null
 
     // History list
     private val _history = mutableListOf<RecognizerResult>()
@@ -38,6 +49,35 @@ object NotificationHandler {
 
     // Callback for history updates
     var onHistoryUpdated: (() -> Unit)? = null
+
+    /** 初始化广播接收器，用于处理按钮点击关闭通知 */
+    fun init(context: Context) {
+        if (dismissReceiver == null) {
+            dismissReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(ctx: Context, intent: Intent) {
+                        if (intent.action == ACTION_DISMISS_NOTIFICATION) {
+                            val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
+                            if (notificationId != -1) {
+                                cancelNotification(ctx, notificationId)
+                                logDebug("按钮点击，关闭通知: $notificationId")
+                            }
+                        }
+                    }
+                }
+            val filter = IntentFilter(ACTION_DISMISS_NOTIFICATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.applicationContext.registerReceiver(
+                    dismissReceiver,
+                    filter,
+                    Context.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                context.applicationContext.registerReceiver(dismissReceiver, filter)
+            }
+            logDebug("已注册通知关闭广播接收器")
+        }
+    }
 
     fun sendNotification(
         context: Context,
@@ -68,25 +108,21 @@ object NotificationHandler {
         // 确保通知渠道已创建
         createNotificationChannel(notificationManager)
 
+        // 先确定最终的 notificationId
+        val finalNotificationId = notificationId ?: notificationIdCounter.incrementAndGet()
+
         val notification: Notification =
             if (isHyperOS(context)) {
                 // 是 HyperOS 3，构建岛通知
-                buildHyperOsIslandNotification(context, result)
+                buildHyperOsIslandNotification(context, result, finalNotificationId)
             } else {
                 // 其他系统，构建标准通知
                 buildStandardNotification(context, result)
             }
 
-        if (notificationId != null) {
-            notificationManager.notify(notificationId, notification)
-            logDebug("已发送通知: $result")
-            return notificationId
-        } else {
-            val notificationId = notificationIdCounter.incrementAndGet()
-            notificationManager.notify(notificationId, notification)
-            logDebug("已发送通知: $result")
-            return notificationId
-        }
+        notificationManager.notify(finalNotificationId, notification)
+        logDebug("已发送通知: $result")
+        return finalNotificationId
     }
 
     fun sendStandardNotification(context: Context, title: String, content: String) {
@@ -146,17 +182,14 @@ object NotificationHandler {
     }
 
     /** 构建通知文本 */
+    @Suppress("DEPRECATION")
     private fun buildNotificationText(result: RecognizerResult): String = buildString {
         if (result.content.isNotEmpty()) {
             append(result.content)
         }
-        if (result.infoTitle.isNotEmpty() && result.infoContent.isNotEmpty()) {
+        if (result.compatInfo.isNotEmpty()) {
             if (isNotEmpty()) append("\n")
-            append("${result.infoContent}：${result.infoTitle}")
-        }
-        if (result.subInfoTitle.isNotEmpty() && result.subInfoContent.isNotEmpty()) {
-            if (isNotEmpty()) append("\n")
-            append("${result.subInfoContent}：${result.subInfoTitle}")
+            append(result.compatInfo)
         }
     }
 
@@ -166,11 +199,27 @@ object NotificationHandler {
         result: RecognizerResult
     ): Notification {
         logDebug("创建普通通知")
+
+        // 创建点击通知跳转到 DetailActivity 的 Intent
+        val detailIntent =
+            Intent(context, DetailActivity::class.java).apply {
+                putExtra("result_id", result.id)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        val contentPendingIntent =
+            PendingIntent.getActivity(
+                context,
+                result.id.hashCode(), // 使用 id 的 hashCode 作为 requestCode
+                detailIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
                 .setContentTitle(result.title)
                 .setOngoing(true)
+                .setContentIntent(contentPendingIntent) // 点击通知跳转到详情页
         val notificationText = buildNotificationText(result)
         if (notificationText.isNotEmpty()) {
             builder.setContentText(notificationText)
@@ -182,24 +231,34 @@ object NotificationHandler {
     /** 构建 HyperOS 3 超级岛通知 */
     private fun buildHyperOsIslandNotification(
         context: Context,
-        result: RecognizerResult
+        result: RecognizerResult,
+        notificationId: Int
     ): Notification {
+        // 创建点击通知跳转到 DetailActivity 的 Intent
+        val detailIntent =
+            Intent(context, DetailActivity::class.java).apply {
+                putExtra("result_id", result.id)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        val contentPendingIntent =
+            PendingIntent.getActivity(
+                context,
+                result.id.hashCode(), // 使用 id 的 hashCode 作为 requestCode
+                detailIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
                 .setContentTitle(result.title)
                 .setOngoing(true)
+                .setContentIntent(contentPendingIntent) // 点击通知跳转到详情页
         val notificationText = buildNotificationText(result)
         if (notificationText.isNotEmpty()) {
             builder.setContentText(notificationText)
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
         }
-        // 自定义布局需要使用 miui.focus.param.custom 而不是 miui.focus.param
-        val customParamsJson = createCustomParamsJson(result)
-        logDebug("customParamsJson: $customParamsJson")
-        builder.extras.putString("miui.focus.param.custom", customParamsJson)
-        // 同时添加 ticker 用于状态栏显示
-        builder.extras.putString("miui.focus.ticker", result.title)
 
         builder.extras.putBundle(
             "miui.focus.pics",
@@ -222,20 +281,30 @@ object NotificationHandler {
             }
         )
 
-        // 添加自定义布局
-        builder.extras.putParcelable(
-            "miui.focus.rv",
-            createFocusRemoteViews(context, result, isDarkMode = false)
-        )
-        builder.extras.putParcelable(
-            "miui.focus.rvNight",
-            createFocusRemoteViews(context, result, isDarkMode = true)
-        )
-        // 超级岛展开状态布局（使用暗色模式）
-        builder.extras.putParcelable(
-            "miui.focus.rv.island.expand",
-            createFocusRemoteViews(context, result, isDarkMode = true)
-        )
+        if (result.content.isNotEmpty()) {
+            // 自定义布局需要使用 miui.focus.param.custom
+            val customParamsJson = createCustomParamsJson(result)
+            builder.extras.putString("miui.focus.param.custom", customParamsJson)
+            // 同时添加 ticker 用于状态栏显示
+            builder.extras.putString("miui.focus.ticker", result.title)
+
+            // 添加自定义布局
+            builder.extras.putParcelable(
+                "miui.focus.rv",
+                createFocusRemoteViews(context, result, isDarkMode = false, notificationId)
+            )
+            builder.extras.putParcelable(
+                "miui.focus.rvNight",
+                createFocusRemoteViews(context, result, isDarkMode = true, notificationId)
+            )
+            // 超级岛展开状态布局（使用暗色模式）
+            builder.extras.putParcelable(
+                "miui.focus.rv.island.expand",
+                createFocusRemoteViews(context, result, isDarkMode = true, notificationId)
+            )
+        } else {
+            builder.extras.putString("miui.focus.param", createIslandParamsJson(result))
+        }
 
         logDebug("创建 HyperOS Island 自定义通知成功")
 
@@ -255,11 +324,8 @@ object NotificationHandler {
             put("protocol", 1)
             put("enableFloat", true)
             put("updatable", true)
-            put("isShowNotification", true)
+            // put("isShowNotification", true)
             put("ticker", tickerText)
-            put("tickerPic", "miui.focus.pic_icon_light")
-            put("tickerPicDark", "miui.focus.pic_icon_dark")
-            put("timeout", 999999)
             put("reopen", "reopen")
 
             // 息屏显示配置
@@ -271,25 +337,7 @@ object NotificationHandler {
                 "param_island",
                 buildJsonObject {
                     put("islandProperty", 1)
-                    put("islandPriority", 2)
-                    put("islandTimeout", 280)
-                    put("dismissIsland", false)
-                    put("needCloseAnimation", true)
-
-                    // 未展开态（小岛/胶囊态）
-                    put(
-                        "smallIslandArea",
-                        buildJsonObject {
-                            put(
-                                "picInfo",
-                                buildJsonObject {
-                                    put("type", 1)
-                                    put("pic", "miui.focus.pic_icon_light")
-                                }
-                            )
-                        }
-                    )
-
+                    put("islandTimeout", 7200)
                     // 展开态（大岛）
                     put(
                         "bigIslandArea",
@@ -351,8 +399,9 @@ object NotificationHandler {
         return jsonObject.toString()
     }
 
-    /** 创建普通焦点通知参数 JSON（用于 miui.focus.param，不使用自定义布局时） 保留此函数以备不使用自定义 RemoteViews 时使用 */
+    /** 仅有岛的json */
     fun createIslandParamsJson(result: RecognizerResult): String {
+        // 使用 buildJsonObject 动态构建
         val jsonObject = buildJsonObject {
             put(
                 "param_v2",
@@ -362,6 +411,7 @@ object NotificationHandler {
                     put("updatable", true)
                     put("reopen", "reopen")
 
+                    // Ticker: 只有 text 不为空时才拼接
                     val tickerText =
                         if (result.content.isNotEmpty()) "${result.content} ${result.title}"
                         else result.title
@@ -376,6 +426,7 @@ object NotificationHandler {
                             put(
                                 "bigIslandArea",
                                 buildJsonObject {
+                                    // 只有 text 不为空时才添加 imageTextInfoLeft
                                     put(
                                         "imageTextInfoLeft",
                                         buildJsonObject {
@@ -415,21 +466,6 @@ object NotificationHandler {
                                             )
                                         }
                                     )
-                                }
-                            )
-                            put(
-                                "shareData",
-                                buildJsonObject {
-                                    put("title", result.title)
-                                    if (result.content.isNotEmpty()) {
-                                        put("content", result.content)
-                                        put(
-                                            "shareContent",
-                                            "${result.content}：${result.title}"
-                                        )
-                                    } else {
-                                        put("shareContent", result.title)
-                                    }
                                 }
                             )
                         }
@@ -502,10 +538,12 @@ object NotificationHandler {
     }
 
     /** 创建焦点通知 RemoteViews 自定义布局 */
+    @Suppress("DEPRECATION")
     private fun createFocusRemoteViews(
         context: Context,
         result: RecognizerResult,
-        isDarkMode: Boolean
+        isDarkMode: Boolean,
+        notificationId: Int
     ): RemoteViews {
         val layoutId =
             if (isDarkMode) {
@@ -515,35 +553,33 @@ object NotificationHandler {
             }
 
         return RemoteViews(context.packageName, layoutId).apply {
-            // 设置图标
-            setImageViewResource(R.id.ivIcon, R.drawable.wand_stars)
+            // 设置图标（根据 iconType 动态选择）
+            setImageViewResource(R.id.ivIcon, result.iconType.getIconRes())
 
             // 上半部分：标签(content) + 主要内容(title)
             setTextViewText(R.id.tvLabel, result.content.ifEmpty { "识别结果" })
             setTextViewText(R.id.tvMainContent, result.title)
 
-            // 下半部分：描述文字
-            val description = buildString {
-                if (result.infoTitle.isNotEmpty()) {
-                    append(result.infoTitle)
-                    if (result.infoContent.isNotEmpty()) {
-                        append(" · ")
-                        append(result.infoContent)
-                    }
-                }
-                if (result.subInfoTitle.isNotEmpty()) {
-                    if (isNotEmpty()) append("\n")
-                    append(result.subInfoTitle)
-                    if (result.subInfoContent.isNotEmpty()) {
-                        append(" · ")
-                        append(result.subInfoContent)
-                    }
-                }
-            }
-            setTextViewText(R.id.tvDescription, description.ifEmpty { "CustomLand" })
+            // 下半部分：描述文字（使用 compatInfo）
+            setTextViewText(R.id.tvDescription, result.compatInfo.ifEmpty { "CustomLand" })
 
-            // 按钮文字
-            setTextViewText(R.id.btnAction, "查看")
+            // 按钮文字（使用 AI 返回的 buttonText）
+            setTextViewText(R.id.btnAction, result.buttonText.ifEmpty { "已取" })
+
+            // 设置按钮点击事件，点击后关闭通知
+            val dismissIntent =
+                Intent(ACTION_DISMISS_NOTIFICATION).apply {
+                    setPackage(context.packageName)
+                    putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                }
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    notificationId, // 使用 notificationId 作为 requestCode 确保唯一性
+                    dismissIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            setOnClickPendingIntent(R.id.btnAction, pendingIntent)
         }
     }
 

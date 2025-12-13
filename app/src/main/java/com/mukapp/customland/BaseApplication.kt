@@ -12,6 +12,8 @@ class BaseApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 初始化通知处理器（注册广播接收器）
+        NotificationHandler.init(this)
         // val logConfig = LogConfig()
         // logConfig.logLevel = LogLevel.DEBUG
         // logConfig.tag="CustomLand_Log"

@@ -3,7 +3,7 @@ package com.mukapp.customland
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -37,45 +37,30 @@ class NotificationAdapter(
     }
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvTitle: TextView = itemView.findViewById(R.id.tvTitle)
-        private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
-        private val layoutInfo: LinearLayout = itemView.findViewById(R.id.layoutInfo)
-        private val tvInfoTitle: TextView = itemView.findViewById(R.id.tvInfoTitle)
-        private val tvInfoContent: TextView = itemView.findViewById(R.id.tvInfoContent)
-        private val layoutSubInfo: LinearLayout = itemView.findViewById(R.id.layoutSubInfo)
-        private val tvSubInfoTitle: TextView = itemView.findViewById(R.id.tvSubInfoTitle)
-        private val tvSubInfoContent: TextView = itemView.findViewById(R.id.tvSubInfoContent)
-        private val divider: View = itemView.findViewById(R.id.divider)
+        private val ivIcon: ImageView = itemView.findViewById(R.id.ivIcon)
+        private val tvLabel: TextView = itemView.findViewById(R.id.tvLabel)
+        private val tvMainContent: TextView = itemView.findViewById(R.id.tvMainContent)
+        private val tvDescription: TextView = itemView.findViewById(R.id.tvDescription)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
+        @Suppress("DEPRECATION")
         fun bind(item: RecognizerResult) {
-            tvTitle.text = item.title
+            // 设置图标
+            ivIcon.setImageResource(item.iconType.getIconRes())
 
-            if (item.content.isNotEmpty()) {
-                tvContent.text = item.content
-                tvContent.visibility = View.VISIBLE
+            // 设置标签（content 字段）
+            tvLabel.text = item.content.ifEmpty { "识别结果" }
+
+            // 设置主要内容（title 字段）
+            tvMainContent.text = item.title
+
+            // 设置描述（使用 compatInfo）
+            val description = item.compatInfo
+            if (description.isNotEmpty()) {
+                tvDescription.text = description
+                tvDescription.visibility = View.VISIBLE
             } else {
-                tvContent.visibility = View.GONE
-            }
-
-            divider.visibility = View.GONE
-
-            if (item.infoTitle.isNotEmpty() && item.infoContent.isNotEmpty()) {
-                layoutInfo.visibility = View.VISIBLE
-                tvInfoTitle.text = item.infoTitle
-                tvInfoContent.text = item.infoContent
-                divider.visibility = View.VISIBLE
-            } else {
-                layoutInfo.visibility = View.GONE
-            }
-
-            if (item.subInfoTitle.isNotEmpty() && item.subInfoContent.isNotEmpty()) {
-                layoutSubInfo.visibility = View.VISIBLE
-                tvSubInfoTitle.text = item.subInfoTitle
-                tvSubInfoContent.text = item.subInfoContent
-                divider.visibility = View.VISIBLE
-            } else {
-                layoutSubInfo.visibility = View.GONE
+                tvDescription.visibility = View.GONE
             }
 
             // 显示时间
