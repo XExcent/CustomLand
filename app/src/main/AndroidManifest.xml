@@ -22,7 +22,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CustomLand">
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,7 +33,7 @@
 
         <!-- 详情页 -->
         <activity
-            android:name=".DetailActivity"
+            android:name=".ui.DetailActivity"
             android:exported="false" />
 
         <!-- 触发器 Activity - 允许其他应用调起截图识别 -->

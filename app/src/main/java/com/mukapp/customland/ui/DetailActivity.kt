@@ -1,7 +1,8 @@
-package com.mukapp.customland
+package com.mukapp.customland.ui
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.activity.enableEdgeToEdge
@@ -11,9 +12,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.dylanc.longan.dp
 import com.google.android.material.tabs.TabLayout
+import com.mukapp.customland.logic.NotificationHandler
+import com.mukapp.customland.R
+import com.mukapp.customland.logic.RecognizerResult
 import com.mukapp.customland.databinding.ActivityDetailBinding
-import java.io.File
 import org.json.JSONObject
+import java.io.File
 
 class DetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDetailBinding
@@ -120,7 +124,7 @@ class DetailActivity : AppCompatActivity() {
         if (screenshotPath != null) {
             val file = File(filesDir, screenshotPath)
             if (file.exists()) {
-                ivScreenshot.setImageURI(android.net.Uri.fromFile(file))
+                ivScreenshot.setImageURI(Uri.fromFile(file))
                 ivScreenshot.visibility = View.VISIBLE
                 tvNoScreenshot.visibility = View.GONE
             } else {

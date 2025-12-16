@@ -68,7 +68,7 @@
                 android:background="@drawable/focus_button_dark"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="8dp"
-                android:textColor="#88A8E8"
+                android:textColor="#98CCF9"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="已取" />

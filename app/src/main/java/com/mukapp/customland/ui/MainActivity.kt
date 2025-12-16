@@ -1,6 +1,7 @@
-package com.mukapp.customland
+package com.mukapp.customland.ui
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -17,29 +18,34 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.dylanc.longan.appVersionName
 import com.dylanc.longan.dp
 import com.dylanc.longan.toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.mukapp.customland.Constants.EXTRA_TARGET_PAGE
-import com.mukapp.customland.Constants.PREF_API_ADDRESS
-import com.mukapp.customland.Constants.PREF_API_KEY
-import com.mukapp.customland.Constants.PREF_APP_SETTINGS
-import com.mukapp.customland.Constants.PREF_MODEL_NAME
-import com.mukapp.customland.Constants.TARGET_PAGE_SETTING
+import com.mukapp.customland.R
+import com.mukapp.customland.common.Constants
 import com.mukapp.customland.databinding.ActivityMainBinding
+import com.mukapp.customland.logic.AiRecognizer
+import com.mukapp.customland.logic.NotificationHandler
+import com.mukapp.customland.logic.RecognizerResult
 import com.mukapp.customland.service.ScreenshotAccessibilityService
+import com.mukapp.customland.ui.adapter.NotificationAdapter
+import com.mukapp.customland.utils.RootUtils
 import com.mukapp.customland.utils.applyAppTheme
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
 import com.mukapp.customland.utils.setupPreferenceWatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -135,26 +141,28 @@ class MainActivity : AppCompatActivity() {
 
         // Setup RecyclerView
         binding.pageHome.apply {
-            layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this@MainActivity)
+            layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = notificationAdapter
         }
-        binding.pageHome.addItemDecoration(object : RecyclerView.ItemDecoration() {
-            override fun getItemOffsets(
-                outRect: Rect,
-                view: View,
-                parent: RecyclerView,
-                state: RecyclerView.State
-            ) {
-                val position = parent.getChildAdapterPosition(view)
-                val itemCount = state.itemCount
-                if (position == 0) {
-                    outRect.top = 8.dp.toInt()
-                }
-                if (position == itemCount - 1) {
-                    outRect.bottom = 8.dp.toInt()
+        binding.pageHome.addItemDecoration(
+            object : RecyclerView.ItemDecoration() {
+                override fun getItemOffsets(
+                    outRect: Rect,
+                    view: View,
+                    parent: RecyclerView,
+                    state: RecyclerView.State
+                ) {
+                    val position = parent.getChildAdapterPosition(view)
+                    val itemCount = state.itemCount
+                    if (position == 0) {
+                        outRect.top = 8.dp.toInt()
+                    }
+                    if (position == itemCount - 1) {
+                        outRect.bottom = 8.dp.toInt()
+                    }
                 }
             }
-        })
+        )
 
         // Observe History
         NotificationHandler.onHistoryUpdated = {
@@ -179,13 +187,58 @@ class MainActivity : AppCompatActivity() {
 
         binding.cardNotification.setOnClickListener { askNotificationPermission() }
 
+        // Root 权限设置
+        val prefs = getSharedPreferences(Constants.PREF_APP_SETTINGS, MODE_PRIVATE)
+        val isRootEnabled = prefs.getBoolean(Constants.PREF_ROOT_ENABLED, false)
+        binding.switchRoot.isChecked = isRootEnabled
+        updateRootStatus(isRootEnabled)
+
+        // 点击卡片时切换开关
+        binding.cardRoot.setOnClickListener {
+            binding.switchRoot.isChecked = !binding.switchRoot.isChecked
+        }
+
+        binding.switchRoot.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // 请求 Root 权限
+                lifecycleScope.launch {
+                    val hasRoot = withContext(Dispatchers.IO) { RootUtils.requestRootPermission() }
+                    if (hasRoot) {
+                        prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, true) }
+                        updateRootStatus(true)
+                        toast(getString(R.string.toast_root_granted))
+                    } else {
+                        binding.switchRoot.isChecked = false
+                        prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, false) }
+                        updateRootStatus(false)
+                        toast(getString(R.string.toast_root_denied))
+                    }
+                }
+            } else {
+                prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, false) }
+                updateRootStatus(false)
+            }
+        }
+
+        // 多任务隐藏设置
+        val isHideFromRecentsEnabled = prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+        binding.switchHideRecents.isChecked = isHideFromRecentsEnabled
+
+        // 点击卡片时切换开关
+        binding.cardHideRecents.setOnClickListener {
+            binding.switchHideRecents.isChecked = !binding.switchHideRecents.isChecked
+        }
+
+        binding.switchHideRecents.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(Constants.PREF_HIDE_FROM_RECENTS, isChecked) }
+        }
+
         // AI Settings Logic
-        val prefs = getSharedPreferences(PREF_APP_SETTINGS, MODE_PRIVATE)
 
         // Load saved values
-        val savedApi = prefs.getString(PREF_API_ADDRESS, AiRecognizer.api)
-        val savedKey = prefs.getString(PREF_API_KEY, AiRecognizer.apikey)
-        val savedModel = prefs.getString(PREF_MODEL_NAME, AiRecognizer.model)
+        val savedApi = prefs.getString(Constants.PREF_API_ADDRESS, AiRecognizer.api)
+        val savedKey = prefs.getString(Constants.PREF_API_KEY, AiRecognizer.apikey)
+        val savedModel = prefs.getString(Constants.PREF_MODEL_NAME, AiRecognizer.model)
 
         if (savedApi != null) AiRecognizer.api = savedApi
         if (savedKey != null) AiRecognizer.apikey = savedKey
@@ -196,15 +249,18 @@ class MainActivity : AppCompatActivity() {
         binding.etModelName.setText(savedModel)
 
         // Save on change - 使用扩展函数简化代码
-        binding.etApiAddress.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_API_ADDRESS) {
-            AiRecognizer.api = it
-        }
-        binding.etApiKey.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_API_KEY) {
-            AiRecognizer.apikey = it
-        }
-        binding.etModelName.setupPreferenceWatcher(PREF_APP_SETTINGS, PREF_MODEL_NAME) {
-            AiRecognizer.model = it
-        }
+        binding.etApiAddress.setupPreferenceWatcher(
+            Constants.PREF_APP_SETTINGS,
+            Constants.PREF_API_ADDRESS
+        ) { AiRecognizer.api = it }
+        binding.etApiKey.setupPreferenceWatcher(
+            Constants.PREF_APP_SETTINGS,
+            Constants.PREF_API_KEY
+        ) { AiRecognizer.apikey = it }
+        binding.etModelName.setupPreferenceWatcher(
+            Constants.PREF_APP_SETTINGS,
+            Constants.PREF_MODEL_NAME
+        ) { AiRecognizer.model = it }
 
         // 设置 BottomNavigationView 的监听器
         binding.bottomNav.setOnItemSelectedListener { item ->
@@ -230,8 +286,8 @@ class MainActivity : AppCompatActivity() {
         askNotificationPermission()
 
         // 处理 Intent，确定是否需要跳转到特定页面
-        val targetPage = intent.getStringExtra(EXTRA_TARGET_PAGE)
-        if (targetPage == TARGET_PAGE_SETTING) {
+        val targetPage = intent.getStringExtra(Constants.EXTRA_TARGET_PAGE)
+        if (targetPage == Constants.TARGET_PAGE_SETTING) {
             // 如果 Intent 要求显示设置页，则切换到设置页
             binding.bottomNav.selectedItemId = R.id.navigation_settings
             // 手动同步页面状态
@@ -241,7 +297,7 @@ class MainActivity : AppCompatActivity() {
             binding.pageSetting.alpha = 1f
 
             toast(getString(R.string.toast_enable_accessibility))
-            intent.removeExtra(EXTRA_TARGET_PAGE)
+            intent.removeExtra(Constants.EXTRA_TARGET_PAGE)
         } else if (savedInstanceState == null) {
             // 只有在首次启动（非重建）且没有特定目标时，才默认显示主页
             // 如果 savedInstanceState != null，说明是重建（如权限变更），
@@ -261,10 +317,24 @@ class MainActivity : AppCompatActivity() {
                     val selectedId = binding.bottomNav.selectedItemId
 
                     if (selectedId != R.id.navigation_home) {
+                        // 非主页时，先返回主页
                         binding.bottomNav.selectedItemId = R.id.navigation_home
                     } else {
-                        isEnabled = false
-                        onBackPressedDispatcher.onBackPressed()
+                        // 仅仅是把任务移到后台（相当于按了 Home 键），而不销毁 Activity
+                        moveTaskToBack(true)
+
+                        // 检查是否启用了多任务隐藏功能
+                        val hideFromRecents =
+                            prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+                        if (hideFromRecents) {
+                            // 获取 AppTask 并设置从最近任务中排除
+                            val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                            val tasks = am.appTasks
+                            if (tasks.isNotEmpty()) {
+                                // 设置为 true：从多任务中隐藏
+                                tasks[0].setExcludeFromRecents(true)
+                            }
+                        }
                     }
                 }
             }
@@ -332,6 +402,19 @@ class MainActivity : AppCompatActivity() {
         // 每次返回App时，都检查服务的状态
         updateServiceStatus()
         updateNotificationStatus()
+
+        // 如果启用了多任务隐藏功能，恢复时需要将其重新显示
+        val prefs = getSharedPreferences(Constants.PREF_APP_SETTINGS, MODE_PRIVATE)
+        val hideFromRecents = prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+        if (hideFromRecents) {
+            val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            if (tasks.isNotEmpty()) {
+                // 恢复为 false：显示在多任务中
+                // 这样在软件正常使用期间，切换出去是能看到卡片的
+                tasks[0].setExcludeFromRecents(false)
+            }
+        }
     }
 
     // 处理 Activity 已存在于后台并被拉起的情况
@@ -342,12 +425,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        val target = intent.getStringExtra(EXTRA_TARGET_PAGE)
-        if (target == TARGET_PAGE_SETTING) {
+        val target = intent.getStringExtra(Constants.EXTRA_TARGET_PAGE)
+        if (target == Constants.TARGET_PAGE_SETTING) {
             binding.bottomNav.selectedItemId = R.id.navigation_settings
             toast(getString(R.string.toast_enable_accessibility))
             // 建议：处理完后清除 Extra，避免旋转屏幕等操作重复触发
-            intent.removeExtra(EXTRA_TARGET_PAGE)
+            intent.removeExtra(Constants.EXTRA_TARGET_PAGE)
         }
     }
 
@@ -390,6 +473,17 @@ class MainActivity : AppCompatActivity() {
         return isAccessibilityServiceEnabled(ScreenshotAccessibilityService::class.java)
     }
 
+    /** 更新 Root 权限状态显示 */
+    private fun updateRootStatus(isEnabled: Boolean) {
+        if (isEnabled) {
+            binding.tvRootStatus.text = getString(R.string.status_root_granted)
+            binding.tvRootStatus.setTextColor(ContextCompat.getColor(this, R.color.textSecondary))
+        } else {
+            binding.tvRootStatus.text = getString(R.string.root_permission_desc)
+            binding.tvRootStatus.setTextColor(ContextCompat.getColor(this, R.color.textSecondary))
+        }
+    }
+
     private fun showNotificationPermissionDialog() {
         MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
             .applyAppTheme()
@@ -424,10 +518,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 显示操作选择对话框 */
     private fun showActionDialog(result: RecognizerResult) {
-        val items = arrayOf(
-            getString(R.string.action_resend),
-            getString(R.string.action_delete)
-        )
+        val items = arrayOf(getString(R.string.action_resend), getString(R.string.action_delete))
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
         MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
             .applyAppTheme()

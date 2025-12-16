@@ -14,4 +14,8 @@
 
     <color name="theme20">#3357A2DB</color>
     <color name="theme40">#6657A2DB</color>
+    
+    <color name="onSurfaceVariant">#3F484A</color>
+    <color name="primaryContainer">#CCE5FF</color>
+    <color name="surfaceContainerHighest">#DEE3E5</color>
 </resources>

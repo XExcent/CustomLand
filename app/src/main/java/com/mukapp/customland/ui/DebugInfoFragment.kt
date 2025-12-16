@@ -1,11 +1,13 @@
-package com.mukapp.customland
+package com.mukapp.customland.ui
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import com.mukapp.customland.R
 import com.mukapp.customland.databinding.FragmentDebugInfoBinding
+import com.mukapp.customland.logic.DebugInfo
 import org.json.JSONObject
 
 class DebugInfoFragment : Fragment() {

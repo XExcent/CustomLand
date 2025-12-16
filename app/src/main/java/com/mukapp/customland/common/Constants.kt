@@ -1,4 +1,4 @@
-package com.mukapp.customland
+package com.mukapp.customland.common
 
 /** 应用常量 */
 object Constants {
@@ -15,6 +15,8 @@ object Constants {
     const val PREF_API_ADDRESS = "api_address"
     const val PREF_API_KEY = "api_key"
     const val PREF_MODEL_NAME = "model_name"
+    const val PREF_ROOT_ENABLED = "root_enabled"
+    const val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
 
     // Intent Extra
     const val EXTRA_TARGET_PAGE = "EXTRA_TARGET_PAGE"

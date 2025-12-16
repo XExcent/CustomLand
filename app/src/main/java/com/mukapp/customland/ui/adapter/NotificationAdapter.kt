@@ -1,4 +1,4 @@
-package com.mukapp.customland
+package com.mukapp.customland.ui.adapter
 
 import android.view.LayoutInflater
 import android.view.View
@@ -8,6 +8,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.mukapp.customland.R
+import com.mukapp.customland.logic.RecognizerResult
 import com.mukapp.customland.utils.TimeUtils
 
 class NotificationAdapter(

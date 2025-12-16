@@ -1,5 +1,6 @@
-package com.mukapp.customland
+package com.mukapp.customland.ui
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -35,7 +36,7 @@ class ScreenshotFragment : Fragment() {
         if (screenshotPath != null) {
             val file = File(requireContext().filesDir, screenshotPath!!)
             if (file.exists()) {
-                binding.ivScreenshot.setImageURI(android.net.Uri.fromFile(file))
+                binding.ivScreenshot.setImageURI(Uri.fromFile(file))
                 binding.ivScreenshot.visibility = View.VISIBLE
                 binding.tvNoScreenshot.visibility = View.GONE
             } else {

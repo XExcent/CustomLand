@@ -1,6 +1,9 @@
 package com.mukapp.customland
 
+import com.mukapp.customland.utils.FixedPrefixPrinter
 import android.app.Application
+import com.dylanc.longan.initLogger
+import com.mukapp.customland.logic.NotificationHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,12 +15,12 @@ class BaseApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // 初始化时注入我们写好的 Printer，并指定你想要的前缀
+        initLogger(printer = FixedPrefixPrinter("[APP]"))
+
         // 初始化通知处理器（注册广播接收器）
         NotificationHandler.init(this)
-        // val logConfig = LogConfig()
-        // logConfig.logLevel = LogLevel.DEBUG
-        // logConfig.tag="CustomLand_Log"
-        // DevLogger.initialize(logConfig)
     }
 
     companion object {

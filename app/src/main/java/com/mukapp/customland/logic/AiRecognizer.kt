@@ -1,12 +1,10 @@
-﻿package com.mukapp.customland
+package com.mukapp.customland.logic
 
 import android.graphics.Bitmap
 import android.util.Base64
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import com.mukapp.customland.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -16,6 +14,10 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 
 object AiRecognizer {
     var api: String = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
@@ -299,7 +301,7 @@ enum class IconType {
 
 @Serializable
 data class RecognizerResult(
-    val id: String = java.util.UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
     val title: String,
     val content: String = "",
@@ -320,7 +322,7 @@ data class RecognizerResult(
     /** 获取兼容的补充信息（优先使用新字段，否则从旧字段组合） */
     @Suppress("DEPRECATION")
     val compatInfo: String
-        get() = if (info.isNotEmpty()) info else buildLegacyInfo()
+        get() = info.ifEmpty { buildLegacyInfo() }
 
     /** 从旧字段构建补充信息 */
     @Suppress("DEPRECATION")

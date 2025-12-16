@@ -14,11 +14,11 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
-import com.mukapp.customland.AiRecognizer
-import com.mukapp.customland.Constants.SCREENSHOT_DELAY_MS
-import com.mukapp.customland.NotificationHandler
+import com.mukapp.customland.logic.AiRecognizer
+import com.mukapp.customland.common.Constants.SCREENSHOT_DELAY_MS
+import com.mukapp.customland.logic.NotificationHandler
 import com.mukapp.customland.R
-import com.mukapp.customland.RecognizerResult
+import com.mukapp.customland.logic.RecognizerResult
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

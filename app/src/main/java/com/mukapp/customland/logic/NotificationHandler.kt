@@ -1,4 +1,4 @@
-package com.mukapp.customland
+package com.mukapp.customland.logic
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,25 +9,28 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.drawable.Icon
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
-import com.mukapp.customland.Constants.MAX_HISTORY_SIZE
-import com.mukapp.customland.Constants.PREF_HISTORY_JSON
-import com.mukapp.customland.Constants.PREF_NOTIFICATION_HISTORY
-import java.util.concurrent.atomic.AtomicInteger
+import com.mukapp.customland.BaseApplication
+import com.mukapp.customland.R
+import com.mukapp.customland.common.Constants
+import com.mukapp.customland.ui.DetailActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /** 通知处理器 根据你提供的PDF文档，检查是否为 HyperOS 3，并相应地发送岛通知或普通通知。 */
 object NotificationHandler {
@@ -66,15 +69,12 @@ object NotificationHandler {
                     }
                 }
             val filter = IntentFilter(ACTION_DISMISS_NOTIFICATION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.applicationContext.registerReceiver(
-                    dismissReceiver,
-                    filter,
-                    Context.RECEIVER_NOT_EXPORTED
-                )
-            } else {
-                context.applicationContext.registerReceiver(dismissReceiver, filter)
-            }
+            ContextCompat.registerReceiver(
+                context.applicationContext,
+                dismissReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             logDebug("已注册通知关闭广播接收器")
         }
     }
@@ -90,13 +90,13 @@ object NotificationHandler {
         if (notificationId != null) {
             _history.add(0, result) // Add to top
             // 限制历史记录数量
-            if (_history.size > MAX_HISTORY_SIZE) {
+            if (_history.size > Constants.MAX_HISTORY_SIZE) {
                 val removedItem = _history.removeAt(_history.size - 1)
                 // 删除被移除项的截图
                 deleteScreenshot(context, removedItem)
             }
             // 使用应用协程作用域替代 GlobalScope
-            BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
+            BaseApplication.Companion.getInstance().applicationScope.launch(Dispatchers.IO) {
                 saveHistory(context)
             }
             onHistoryUpdated?.invoke()
@@ -297,6 +297,16 @@ object NotificationHandler {
                 "miui.focus.rvNight",
                 createFocusRemoteViews(context, result, isDarkMode = true, notificationId)
             )
+            builder.extras.putParcelable(
+                "miui.focus.rv.fullAod",
+                createFocusRemoteViews(
+                    context,
+                    result,
+                    isDarkMode = true,
+                    notificationId,
+                    showButton = false
+                )
+            )
             // 超级岛展开状态布局（使用暗色模式）
             builder.extras.putParcelable(
                 "miui.focus.rv.island.expand",
@@ -491,13 +501,13 @@ object NotificationHandler {
             try {
                 val prefs =
                     context.getSharedPreferences(
-                        PREF_NOTIFICATION_HISTORY,
+                        Constants.PREF_NOTIFICATION_HISTORY,
                         Context.MODE_PRIVATE
                     )
                 // Limit to MAX_HISTORY_SIZE items
-                val historyToSave = _history.take(MAX_HISTORY_SIZE)
-                val jsonString = Json.encodeToString(historyToSave)
-                prefs.edit { putString(PREF_HISTORY_JSON, jsonString) }
+                val historyToSave = _history.take(Constants.MAX_HISTORY_SIZE)
+                val jsonString = Json.Default.encodeToString(historyToSave)
+                prefs.edit { putString(Constants.PREF_HISTORY_JSON, jsonString) }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -509,12 +519,13 @@ object NotificationHandler {
             try {
                 val prefs =
                     context.getSharedPreferences(
-                        PREF_NOTIFICATION_HISTORY,
+                        Constants.PREF_NOTIFICATION_HISTORY,
                         Context.MODE_PRIVATE
                     )
-                val jsonString = prefs.getString(PREF_HISTORY_JSON, "[]") ?: "[]"
+                val jsonString = prefs.getString(Constants.PREF_HISTORY_JSON, "[]") ?: "[]"
 
-                val loadedHistory = Json.decodeFromString<List<RecognizerResult>>(jsonString)
+                val loadedHistory =
+                    Json.Default.decodeFromString<List<RecognizerResult>>(jsonString)
 
                 withContext(Dispatchers.Main) {
                     _history.clear()
@@ -531,7 +542,7 @@ object NotificationHandler {
     fun deleteHistoryItem(context: Context, item: RecognizerResult) {
         _history.remove(item)
         deleteScreenshot(context, item)
-        BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
+        BaseApplication.Companion.getInstance().applicationScope.launch(Dispatchers.IO) {
             saveHistory(context)
         }
         onHistoryUpdated?.invoke()
@@ -543,7 +554,8 @@ object NotificationHandler {
         context: Context,
         result: RecognizerResult,
         isDarkMode: Boolean,
-        notificationId: Int
+        notificationId: Int,
+        showButton: Boolean = true
     ): RemoteViews {
         val layoutId =
             if (isDarkMode) {
@@ -563,23 +575,28 @@ object NotificationHandler {
             // 下半部分：描述文字（使用 compatInfo）
             setTextViewText(R.id.tvDescription, result.compatInfo.ifEmpty { "CustomLand" })
 
-            // 按钮文字（使用 AI 返回的 buttonText）
-            setTextViewText(R.id.btnAction, result.buttonText.ifEmpty { "已取" })
+            if (showButton) {
+                // 按钮文字（使用 AI 返回的 buttonText）
+                setTextViewText(R.id.btnAction, result.buttonText.ifEmpty { "已取" })
 
-            // 设置按钮点击事件，点击后关闭通知
-            val dismissIntent =
-                Intent(ACTION_DISMISS_NOTIFICATION).apply {
-                    setPackage(context.packageName)
-                    putExtra(EXTRA_NOTIFICATION_ID, notificationId)
-                }
-            val pendingIntent =
-                PendingIntent.getBroadcast(
-                    context,
-                    notificationId, // 使用 notificationId 作为 requestCode 确保唯一性
-                    dismissIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            setOnClickPendingIntent(R.id.btnAction, pendingIntent)
+                // 设置按钮点击事件，点击后关闭通知
+                val dismissIntent =
+                    Intent(ACTION_DISMISS_NOTIFICATION).apply {
+                        setPackage(context.packageName)
+                        putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                    }
+                val pendingIntent =
+                    PendingIntent.getBroadcast(
+                        context,
+                        notificationId, // 使用 notificationId 作为 requestCode 确保唯一性
+                        dismissIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                setOnClickPendingIntent(R.id.btnAction, pendingIntent)
+            } else {
+                // 隐藏按钮
+                setViewVisibility(R.id.btnAction, View.GONE)
+            }
         }
     }
 
@@ -587,7 +604,7 @@ object NotificationHandler {
     private fun deleteScreenshot(context: Context, item: RecognizerResult) {
         item.screenshotPath?.let { path ->
             try {
-                val file = java.io.File(context.filesDir, path)
+                val file = File(context.filesDir, path)
                 if (file.exists()) {
                     file.delete()
                     logDebug("已删除截图: ${file.absolutePath}")
