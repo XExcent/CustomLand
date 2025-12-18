@@ -65,7 +65,7 @@ class DebugInfoFragment : Fragment() {
         return try {
             val jsonObject = JSONObject(json)
             jsonObject.toString(2) // 缩进2个空格
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             json // 如果解析失败，返回原始字符串
         }
     }

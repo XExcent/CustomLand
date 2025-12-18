@@ -18,7 +18,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
@@ -33,6 +32,7 @@ import com.dylanc.longan.toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mukapp.customland.R
 import com.mukapp.customland.common.Constants
+import com.mukapp.customland.common.MMKVHelper
 import com.mukapp.customland.databinding.ActivityMainBinding
 import com.mukapp.customland.logic.AiRecognizer
 import com.mukapp.customland.logic.NotificationHandler
@@ -188,8 +188,7 @@ class MainActivity : AppCompatActivity() {
         binding.cardNotification.setOnClickListener { askNotificationPermission() }
 
         // Root 权限设置
-        val prefs = getSharedPreferences(Constants.PREF_APP_SETTINGS, MODE_PRIVATE)
-        val isRootEnabled = prefs.getBoolean(Constants.PREF_ROOT_ENABLED, false)
+        val isRootEnabled = MMKVHelper.getBoolean(Constants.PREF_ROOT_ENABLED, false)
         binding.switchRoot.isChecked = isRootEnabled
         updateRootStatus(isRootEnabled)
 
@@ -204,24 +203,25 @@ class MainActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     val hasRoot = withContext(Dispatchers.IO) { RootUtils.requestRootPermission() }
                     if (hasRoot) {
-                        prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, true) }
+                        MMKVHelper.putBoolean(Constants.PREF_ROOT_ENABLED, true)
                         updateRootStatus(true)
                         toast(getString(R.string.toast_root_granted))
                     } else {
                         binding.switchRoot.isChecked = false
-                        prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, false) }
+                        MMKVHelper.putBoolean(Constants.PREF_ROOT_ENABLED, false)
                         updateRootStatus(false)
                         toast(getString(R.string.toast_root_denied))
                     }
                 }
             } else {
-                prefs.edit { putBoolean(Constants.PREF_ROOT_ENABLED, false) }
+                MMKVHelper.putBoolean(Constants.PREF_ROOT_ENABLED, false)
                 updateRootStatus(false)
             }
         }
 
         // 多任务隐藏设置
-        val isHideFromRecentsEnabled = prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+        val isHideFromRecentsEnabled =
+            MMKVHelper.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
         binding.switchHideRecents.isChecked = isHideFromRecentsEnabled
 
         // 点击卡片时切换开关
@@ -230,37 +230,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.switchHideRecents.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(Constants.PREF_HIDE_FROM_RECENTS, isChecked) }
+            MMKVHelper.putBoolean(Constants.PREF_HIDE_FROM_RECENTS, isChecked)
         }
 
         // AI Settings Logic
 
-        // Load saved values
-        val savedApi = prefs.getString(Constants.PREF_API_ADDRESS, AiRecognizer.api)
-        val savedKey = prefs.getString(Constants.PREF_API_KEY, AiRecognizer.apikey)
-        val savedModel = prefs.getString(Constants.PREF_MODEL_NAME, AiRecognizer.model)
+        // 加载已保存的值显示到 UI（AiRecognizer 会在使用时自动从 MMKV 加载）
+        binding.etApiAddress.setText(
+            MMKVHelper.getString(
+                Constants.PREF_API_ADDRESS,
+                AiRecognizer.api
+            )
+        )
+        binding.etApiKey.setText(MMKVHelper.getString(Constants.PREF_API_KEY, AiRecognizer.apikey))
+        binding.etModelName.setText(
+            MMKVHelper.getString(
+                Constants.PREF_MODEL_NAME,
+                AiRecognizer.model
+            )
+        )
 
-        if (savedApi != null) AiRecognizer.api = savedApi
-        if (savedKey != null) AiRecognizer.apikey = savedKey
-        if (savedModel != null) AiRecognizer.model = savedModel
-
-        binding.etApiAddress.setText(savedApi)
-        binding.etApiKey.setText(savedKey)
-        binding.etModelName.setText(savedModel)
-
-        // Save on change - 使用扩展函数简化代码
-        binding.etApiAddress.setupPreferenceWatcher(
-            Constants.PREF_APP_SETTINGS,
-            Constants.PREF_API_ADDRESS
-        ) { AiRecognizer.api = it }
-        binding.etApiKey.setupPreferenceWatcher(
-            Constants.PREF_APP_SETTINGS,
-            Constants.PREF_API_KEY
-        ) { AiRecognizer.apikey = it }
-        binding.etModelName.setupPreferenceWatcher(
-            Constants.PREF_APP_SETTINGS,
-            Constants.PREF_MODEL_NAME
-        ) { AiRecognizer.model = it }
+        // 输入变化时自动保存到 MMKV
+        binding.etApiAddress.setupPreferenceWatcher(Constants.PREF_API_ADDRESS)
+        binding.etApiKey.setupPreferenceWatcher(Constants.PREF_API_KEY)
+        binding.etModelName.setupPreferenceWatcher(Constants.PREF_MODEL_NAME)
 
         // 设置 BottomNavigationView 的监听器
         binding.bottomNav.setOnItemSelectedListener { item ->
@@ -325,7 +318,7 @@ class MainActivity : AppCompatActivity() {
 
                         // 检查是否启用了多任务隐藏功能
                         val hideFromRecents =
-                            prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+                            MMKVHelper.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
                         if (hideFromRecents) {
                             // 获取 AppTask 并设置从最近任务中排除
                             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -404,8 +397,7 @@ class MainActivity : AppCompatActivity() {
         updateNotificationStatus()
 
         // 如果启用了多任务隐藏功能，恢复时需要将其重新显示
-        val prefs = getSharedPreferences(Constants.PREF_APP_SETTINGS, MODE_PRIVATE)
-        val hideFromRecents = prefs.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
+        val hideFromRecents = MMKVHelper.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
         if (hideFromRecents) {
             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
             val tasks = am.appTasks

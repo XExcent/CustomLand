@@ -1,10 +1,18 @@
 package com.mukapp.customland.logic
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
+import androidx.core.os.ConfigurationCompat
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
+import com.dylanc.longan.logInfo
 import com.mukapp.customland.R
+import com.mukapp.customland.common.MMKVHelper
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -14,28 +22,48 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.UUID
 
 object AiRecognizer {
     var api: String = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
     var apikey: String = ""
     var model: String = "glm-4v-flash"
 
+    /** 从 MMKV 加载最新配置 */
+    private fun loadConfig() {
+        api = MMKVHelper.getString(
+            com.mukapp.customland.common.Constants.PREF_API_ADDRESS,
+            api
+        )
+        apikey = MMKVHelper.getString(
+            com.mukapp.customland.common.Constants.PREF_API_KEY,
+            apikey
+        )
+        model = MMKVHelper.getString(
+            com.mukapp.customland.common.Constants.PREF_MODEL_NAME,
+            model
+        )
+        logDebug("已加载 API 配置：api=$api, model=$model, apikey=${if (apikey.isNotEmpty()) "***已设置***" else "未设置"}")
+    }
+
     /**
      * @param bitmap 待识别截图
      * @param screenshotPath 截图保存路径（可选）
      * @return 识别出的文字结果
      */
-    suspend fun analyze(bitmap: Bitmap, screenshotPath: String? = null): RecognizerResult {
+    suspend fun analyze(
+        context: Context,
+        bitmap: Bitmap,
+        screenshotPath: String? = null
+    ): RecognizerResult {
         return withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
             var requestJson = ""
             var responseJson = ""
 
             try {
+                // 每次请求都从 MMKV 加载最新配置
+                loadConfig()
+
                 logDebug("开始请求")
 
                 val byteArrayOutputStream = ByteArrayOutputStream()
@@ -43,10 +71,18 @@ object AiRecognizer {
                 val base64Image =
                     Base64.encodeToString(byteArrayOutputStream.toByteArray(), Base64.NO_WRAP)
 
+                val currentLocale =
+                    ConfigurationCompat.getLocales(context.resources.configuration).get(0)
+
+                val languageTag = currentLocale?.toLanguageTag()
+                logInfo("用户语言：$languageTag")
                 val promptText =
                     """
                     # Role
                     你是一个专为“灵动岛”UI设计的各种截图信息提取专家。你的任务是从图片中提取关键信息，并将其转化为符合严格UI限制的结构化JSON数据。
+                    
+                    # Language
+                    用户设备的语言设置为：${languageTag}，请根据此语言输出。
                     
                     # Critical Constraints (最高优先级)
                     1. **输出格式**：仅输出纯 JSON 字符串。严禁使用 ```json 代码块、Markdown 标记或任何解释性文字。
@@ -100,7 +136,7 @@ object AiRecognizer {
                     
                     User Input: [丰巢截图: 取件码 882299, 顺丰快递]
                     Assistant Output: {"title":"882299","content":"快递柜","info":"顺丰速运\n丰巢快递柜","iconType":"PACKAGE","buttonText":"已取"}
-                """.trimIndent()
+                    """.trimIndent()
 
                 // 2. 使用 DSL 构建 JSON
                 val jsonObject = buildJsonObject {

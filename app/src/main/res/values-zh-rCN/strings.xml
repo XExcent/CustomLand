@@ -1,0 +1,68 @@
+<resources>
+    <string name="app_name">CustomLand</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_settings">设置</string>
+    <string name="app_version">软件版本：%1$s</string>
+    <string name="developer_name">开发者：MUK</string>
+    <string name="coolapk_link_text">打开开发者酷安</string>
+
+    <string name="permission_settings">权限设置</string>
+
+    <string name="accessibility_service">无障碍服务</string>
+    <string name="accessibility_service_description">无障碍服务用于截图供 AI 识别</string>
+
+    <string name="notification_permission">通知权限</string>
+    <string name="dialog_notification_permission_title">需要通知权限</string>
+    <string name="dialog_notification_permission_message">需要通知权限才能显示识别结果，请在设置中手动开启</string>
+
+    <string name="root_permission">Root 权限（可选）</string>
+    <string name="root_permission_desc">Root 权限可以在识别时自动开启无障碍权限</string>
+
+    <string name="status_enabled">已开启</string>
+    <string name="status_disabled">未开启</string>
+    <string name="status_root_granted">已授权</string>
+    <string name="status_recognizing">识别中</string>
+
+    <string name="other_settings">其他设置</string>
+
+    <string name="hide_from_recents">返回时隐藏多任务</string>
+    <string name="hide_from_recents_desc">从主页退出时将软件从多任务列表隐藏</string>
+
+    <string name="ai_settings">AI 设置</string>
+    <string name="hint_api_address">API 地址</string>
+    <string name="hint_api_key">API 密钥</string>
+    <string name="hint_model_name">模型</string>
+
+    <string name="detail_title">通知详情</string>
+
+    <string name="tab_screenshot">截图</string>
+    <string name="tab_debug_info">调试信息</string>
+
+    <string name="screenshot_description">通知截图</string>
+    <string name="no_screenshot">暂无截图</string>
+
+    <string name="no_debug_info">暂无调试信息</string>
+    <string name="debug_duration">耗时</string>
+    <string name="duration_format">%d 毫秒</string>
+    <string name="debug_error_message">错误信息</string>
+    <string name="debug_request_json">请求 JSON</string>
+    <string name="debug_response_json">响应 JSON</string>
+
+    <string name="dialog_action_title">选择操作</string>
+
+    <string name="action_settings">去开启</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_back">返回</string>
+    <string name="action_resend">再次发送</string>
+
+    <string name="dialog_delete_title">删除通知</string>
+    <string name="dialog_delete_message">确定要删除这条通知记录吗？</string>
+
+    <string name="toast_root_granted">Root 已授权</string>
+    <string name="toast_root_denied">Root 授权失败</string>
+    <string name="toast_root_lost">Root 权限失效，请手动开启无障碍服务</string>
+    <string name="toast_enable_accessibility">请先开启无障碍服务</string>
+    <string name="toast_resent">已重新发送通知</string>
+    <string name="toast_deleted">已删除</string>
+</resources>

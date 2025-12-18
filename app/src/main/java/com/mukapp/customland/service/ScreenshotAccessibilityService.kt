@@ -134,7 +134,8 @@ class ScreenshotAccessibilityService : AccessibilityService() {
                         applicationContext,
                         RecognizerResult(title = getString(R.string.status_recognizing))
                     )
-                val recognitionResult = AiRecognizer.analyze(bitmap, screenshotPath)
+                val recognitionResult =
+                    AiRecognizer.analyze(applicationContext, bitmap, screenshotPath)
                 // 发送通知（无论成功还是失败）
                 NotificationHandler.sendNotification(
                     applicationContext,

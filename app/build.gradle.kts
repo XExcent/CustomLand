@@ -62,4 +62,5 @@ dependencies {
     implementation("com.github.DylanCaiCoding.Longan:longan:_")
     implementation(KotlinX.serialization.json)
     implementation("com.github.Dimezis:BlurView:_")
+    implementation("com.tencent:mmkv:_")
 }

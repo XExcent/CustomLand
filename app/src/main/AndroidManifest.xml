@@ -63,11 +63,6 @@
             </intent-filter>
         </service>
 
-        <!--
-          删除了 ScreenshotCaptureService (前台服务)
-          删除了 ScreenshotTriggerActivity (透明Activity)
-        -->
-
         <!-- 新增: 无障碍服务 -->
         <service
             android:name=".service.ScreenshotAccessibilityService"

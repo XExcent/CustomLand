@@ -8,12 +8,12 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
-import androidx.core.content.edit
 import com.dylanc.longan.dp
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.shape.MaterialShapeDrawable
 import com.google.android.material.shape.ShapeAppearanceModel
 import com.mukapp.customland.R
+import com.mukapp.customland.common.MMKVHelper
 
 /** 检查无障碍服务是否已启用 */
 fun Context.isAccessibilityServiceEnabled(serviceClass: Class<out AccessibilityService>): Boolean {
@@ -31,11 +31,11 @@ fun Context.isAccessibilityServiceEnabled(serviceClass: Class<out AccessibilityS
     }
 }
 
-/** 为 EditText 设置 SharedPreferences 自动保存监听器 */
+/** 为 EditText 设置 MMKV 自动保存监听器 */
 fun EditText.setupPreferenceWatcher(
-    prefsName: String,
+    // prefsName: String,
     prefKey: String,
-    onChanged: (String) -> Unit
+    onChanged: (String) -> Unit = {}
 ) {
     addTextChangedListener(
         object : TextWatcher {
@@ -51,9 +51,7 @@ fun EditText.setupPreferenceWatcher(
             override fun afterTextChanged(s: Editable?) {
                 val value = s.toString()
                 onChanged(value)
-                context.getSharedPreferences(prefsName, Context.MODE_PRIVATE).edit {
-                    putString(prefKey, value)
-                }
+                MMKVHelper.putString(prefKey, value)
             }
         }
     )

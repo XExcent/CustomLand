@@ -2,7 +2,6 @@ package com.mukapp.customland.service
 
 import android.annotation.SuppressLint
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
@@ -12,9 +11,9 @@ import android.service.quicksettings.TileService
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import com.mukapp.customland.common.Constants.EXTRA_TARGET_PAGE
-import com.mukapp.customland.common.Constants.PREF_APP_SETTINGS
 import com.mukapp.customland.common.Constants.PREF_ROOT_ENABLED
 import com.mukapp.customland.common.Constants.TARGET_PAGE_SETTING
+import com.mukapp.customland.common.MMKVHelper
 import com.mukapp.customland.ui.MainActivity
 import com.mukapp.customland.utils.RootUtils
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
@@ -38,8 +37,7 @@ class ScreenshotTileService : TileService() {
             logDebug("无障碍服务未开启")
 
             // 检查是否启用了 Root 权限
-            val prefs = getSharedPreferences(PREF_APP_SETTINGS, Context.MODE_PRIVATE)
-            val isRootEnabled = prefs.getBoolean(PREF_ROOT_ENABLED, false)
+            val isRootEnabled = MMKVHelper.getBoolean(PREF_ROOT_ENABLED, false)
 
             if (isRootEnabled) {
                 logDebug("用户允许使用 Root，检查 Root 权限是否可用")
@@ -104,6 +102,7 @@ class ScreenshotTileService : TileService() {
     }
 
     /** 跳转到设置页 */
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun navigateToSettings() {
         runCatching {
             // 1. 统一创建 Intent
@@ -122,7 +121,6 @@ class ScreenshotTileService : TileService() {
                 )
                 startActivityAndCollapse(pendingIntent)
             } else {
-                @SuppressLint("StartActivityAndCollapseDeprecated")
                 @Suppress("DEPRECATION")
                 startActivityAndCollapse(intent)
             }

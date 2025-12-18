@@ -15,26 +15,25 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import com.mukapp.customland.BaseApplication
 import com.mukapp.customland.R
 import com.mukapp.customland.common.Constants
+import com.mukapp.customland.common.MMKVHelper
 import com.mukapp.customland.ui.DetailActivity
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 
 /** 通知处理器 根据你提供的PDF文档，检查是否为 HyperOS 3，并相应地发送岛通知或普通通知。 */
 object NotificationHandler {
-
     private const val CHANNEL_ID = "default"
     private const val CHANNEL_NAME = "默认通知渠道"
     private const val ACTION_DISMISS_NOTIFICATION =
@@ -49,6 +48,9 @@ object NotificationHandler {
     private val _history = mutableListOf<RecognizerResult>()
     val history: List<RecognizerResult>
         get() = _history
+
+    // 标记历史记录是否已加载，防止未加载时覆盖旧数据
+    private var historyLoaded = false
 
     // Callback for history updates
     var onHistoryUpdated: (() -> Unit)? = null
@@ -84,10 +86,13 @@ object NotificationHandler {
         result: RecognizerResult,
         notificationId: Int? = null
     ): Int {
-        // 只有新通知才添加到历史（notificationId == null 表示新通知）
-        // 重新发送的通知（notificationId != null）不应该重复记录
-        // 包括错误通知也会添加到历史记录
+        // 传入 notificationId 表示更新已有通知（最终识别结果），此时才添加到历史
+        // 不传 notificationId 表示临时通知（如"识别中"），不添加历史
         if (notificationId != null) {
+            // 确保在添加新记录前先加载已有历史，防止覆盖旧数据
+            if (!historyLoaded) {
+                kotlinx.coroutines.runBlocking { loadHistory(context) }
+            }
             _history.add(0, result) // Add to top
             // 限制历史记录数量
             if (_history.size > Constants.MAX_HISTORY_SIZE) {
@@ -96,7 +101,7 @@ object NotificationHandler {
                 deleteScreenshot(context, removedItem)
             }
             // 使用应用协程作用域替代 GlobalScope
-            BaseApplication.Companion.getInstance().applicationScope.launch(Dispatchers.IO) {
+            BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
                 saveHistory(context)
             }
             onHistoryUpdated?.invoke()
@@ -496,44 +501,38 @@ object NotificationHandler {
         return jsonObject.toString()
     }
 
+    @Suppress("UNUSED_PARAMETER") // 保留 context 参数以保持 API 兼容
     suspend fun saveHistory(context: Context) {
         withContext(Dispatchers.IO) {
             try {
-                val prefs =
-                    context.getSharedPreferences(
-                        Constants.PREF_NOTIFICATION_HISTORY,
-                        Context.MODE_PRIVATE
-                    )
                 // Limit to MAX_HISTORY_SIZE items
                 val historyToSave = _history.take(Constants.MAX_HISTORY_SIZE)
-                val jsonString = Json.Default.encodeToString(historyToSave)
-                prefs.edit { putString(Constants.PREF_HISTORY_JSON, jsonString) }
+                val jsonString = Json.encodeToString(historyToSave)
+                MMKVHelper.putHistoryJson(Constants.PREF_HISTORY_JSON, jsonString)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
+    @Suppress("UNUSED_PARAMETER") // 保留 context 参数以保持 API 兼容
     suspend fun loadHistory(context: Context) {
         withContext(Dispatchers.IO) {
             try {
-                val prefs =
-                    context.getSharedPreferences(
-                        Constants.PREF_NOTIFICATION_HISTORY,
-                        Context.MODE_PRIVATE
-                    )
-                val jsonString = prefs.getString(Constants.PREF_HISTORY_JSON, "[]") ?: "[]"
+                val jsonString = MMKVHelper.getHistoryJson(Constants.PREF_HISTORY_JSON, "[]")
 
                 val loadedHistory =
-                    Json.Default.decodeFromString<List<RecognizerResult>>(jsonString)
+                    Json.decodeFromString<List<RecognizerResult>>(jsonString)
 
                 withContext(Dispatchers.Main) {
                     _history.clear()
                     _history.addAll(loadedHistory)
+                    historyLoaded = true // 标记已加载
                     onHistoryUpdated?.invoke()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                historyLoaded = true // 即使失败也标记为已加载，避免重复尝试
             }
         }
     }
@@ -542,7 +541,7 @@ object NotificationHandler {
     fun deleteHistoryItem(context: Context, item: RecognizerResult) {
         _history.remove(item)
         deleteScreenshot(context, item)
-        BaseApplication.Companion.getInstance().applicationScope.launch(Dispatchers.IO) {
+        BaseApplication.getInstance().applicationScope.launch(Dispatchers.IO) {
             saveHistory(context)
         }
         onHistoryUpdated?.invoke()
