@@ -7,10 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
+import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
@@ -36,6 +38,7 @@ class ScreenshotAccessibilityService : AccessibilityService() {
 
     private val screenshotReceiver =
         object : BroadcastReceiver() {
+            @RequiresPermission("android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS")
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == ACTION_TAKE_SCREENSHOT) {
                     logDebug("收到截图广播")
@@ -183,10 +186,18 @@ class ScreenshotAccessibilityService : AccessibilityService() {
     }
 
     // 收起通知栏
+    @Suppress("DEPRECATION")
     fun closeNotificationShade() {
-        // 使用返回操作来关闭通知栏，因为它被证明是有效的
-        val success = performGlobalAction(GLOBAL_ACTION_BACK)
-        logDebug("执行返回操作来关闭通知栏，是否成功: $success")
+        // 需要 Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val success = performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+            if (!success) {
+                performGlobalAction(GLOBAL_ACTION_BACK)
+            }
+        } else {
+            // 降级处理，见方案二
+            sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

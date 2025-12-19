@@ -23,14 +23,14 @@ import com.mukapp.customland.R
 import com.mukapp.customland.common.Constants
 import com.mukapp.customland.common.MMKVHelper
 import com.mukapp.customland.ui.DetailActivity
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /** 通知处理器 根据你提供的PDF文档，检查是否为 HyperOS 3，并相应地发送岛通知或普通通知。 */
 object NotificationHandler {
@@ -116,14 +116,16 @@ object NotificationHandler {
         // 先确定最终的 notificationId
         val finalNotificationId = notificationId ?: notificationIdCounter.incrementAndGet()
 
-        val notification: Notification =
-            if (isHyperOS(context)) {
-                // 是 HyperOS 3，构建岛通知
-                buildHyperOsIslandNotification(context, result, finalNotificationId)
-            } else {
-                // 其他系统，构建标准通知
-                buildStandardNotification(context, result)
-            }
+        val notification: Notification = buildNotification(context, result, finalNotificationId)
+        // if (isHyperOS(context)) {
+        // 是 HyperOS 3，构建岛通知
+        // } else if (Build.VERSION.SDK_INT >= 36) {
+        //     // Android 16 及以上，构建实时通知
+        //     buildAndroid16LiveNotification(context, result)
+        // } else {
+        //     // 其他系统，构建标准通知
+        //     buildStandardNotification(context, result)
+        // }
 
         notificationManager.notify(finalNotificationId, notification)
         logDebug("已发送通知: $result")
@@ -203,7 +205,7 @@ object NotificationHandler {
         context: Context,
         result: RecognizerResult
     ): Notification {
-        logDebug("创建普通通知")
+        logDebug("创建普通通知/实时通知")
 
         // 创建点击通知跳转到 DetailActivity 的 Intent
         val detailIntent =
@@ -222,19 +224,24 @@ object NotificationHandler {
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
+                .setLargeIcon(Icon.createWithResource(context, result.iconType.getIconRes()))
                 .setContentTitle(result.title)
+                .setSubText(result.content)
+                .setShortCriticalText(result.title)
                 .setOngoing(true)
-                .setContentIntent(contentPendingIntent) // 点击通知跳转到详情页
-        val notificationText = buildNotificationText(result)
-        if (notificationText.isNotEmpty()) {
-            builder.setContentText(notificationText)
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
+                .setRequestPromotedOngoing(true)
+                .setContentIntent(contentPendingIntent)
+
+        if (result.info.isNotEmpty()) {
+            builder.setContentText(result.info)
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(result.info))
         }
+
         return builder.build()
     }
 
-    /** 构建 HyperOS 3 超级岛通知 */
-    private fun buildHyperOsIslandNotification(
+    /** 构建通知 (HyperOS Island / Live Update / Standard) */
+    private fun buildNotification(
         context: Context,
         result: RecognizerResult,
         notificationId: Int
@@ -256,13 +263,41 @@ object NotificationHandler {
         val builder =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.wand_stars)
+                .setLargeIcon(Icon.createWithResource(context, result.iconType.getIconRes()))
                 .setContentTitle(result.title)
+                .setSubText(result.content)
+                .setShortCriticalText(result.title)
                 .setOngoing(true)
-                .setContentIntent(contentPendingIntent) // 点击通知跳转到详情页
-        val notificationText = buildNotificationText(result)
-        if (notificationText.isNotEmpty()) {
-            builder.setContentText(notificationText)
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
+                .setOnlyAlertOnce(true)
+                .setRequestPromotedOngoing(true)
+                .setContentIntent(contentPendingIntent)
+
+        if (result.info.isNotEmpty()) {
+            builder.setContentText(result.info)
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(result.info))
+        }
+
+        if (result.content.isNotEmpty()) {
+            // 设置按钮点击事件，点击后关闭通知
+            val dismissIntent =
+                Intent(ACTION_DISMISS_NOTIFICATION).apply {
+                    setPackage(context.packageName)
+                    putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                }
+            val actionPendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    notificationId, // 使用 notificationId 作为 requestCode 确保唯一性
+                    dismissIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.check,
+                    result.buttonText.ifEmpty { "已取" },
+                    actionPendingIntent
+                ).build()
+            )
         }
 
         builder.extras.putBundle(
@@ -321,7 +356,7 @@ object NotificationHandler {
             builder.extras.putString("miui.focus.param", createIslandParamsJson(result))
         }
 
-        logDebug("创建 HyperOS Island 自定义通知成功")
+        logDebug("创建超级岛通知/实时通知/普通通知")
 
         return builder.build()
     }
