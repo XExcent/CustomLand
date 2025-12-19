@@ -65,4 +65,7 @@
     <string name="toast_enable_accessibility">请先开启无障碍服务</string>
     <string name="toast_resent">已重新发送通知</string>
     <string name="toast_deleted">已删除</string>
+
+    <string name="label_screenshot_recognition">截图识别</string>
+    <string name="label_accessibility_service">CustomLand 截图识别服务</string>
 </resources>

@@ -40,11 +40,11 @@
         <!-- 触发器 Activity - 允许其他应用调起截图识别 -->
         <activity
             android:name=".TriggerActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Transparent"
             android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/label_screenshot_recognition"
             android:taskAffinity=""
-            android:label="截图识别">
+            android:theme="@style/Theme.Transparent">
             <intent-filter>
                 <!-- 自定义 action，其他应用可以通过此 action 调起 -->
                 <action android:name="com.mukapp.customland.TRIGGER_SCREENSHOT" />
@@ -57,7 +57,7 @@
             android:name=".service.ScreenshotTileService"
             android:exported="true"
             android:icon="@drawable/wand_stars"
-            android:label="截图识别"
+            android:label="@string/label_screenshot_recognition"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -68,7 +68,7 @@
         <service
             android:name=".service.ScreenshotAccessibilityService"
             android:exported="false"
-            android:label="截图识别服务"
+            android:label="@string/label_accessibility_service"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             tools:ignore="AccessibilityPolicy">
             <intent-filter>

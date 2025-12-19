@@ -65,4 +65,7 @@
     <string name="toast_enable_accessibility">Please enable Accessibility Service first</string>
     <string name="toast_resent">Notification resent</string>
     <string name="toast_deleted">Deleted</string>
+
+    <string name="label_screenshot_recognition">Screenshot Recognition</string>
+    <string name="label_accessibility_service">CustomLand Screenshot Recognition Service</string>
 </resources>
