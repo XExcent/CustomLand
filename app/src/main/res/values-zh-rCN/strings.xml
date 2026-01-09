@@ -68,4 +68,28 @@
 
     <string name="label_screenshot_recognition">截图识别</string>
     <string name="label_accessibility_service">CustomLand 截图识别服务</string>
+
+    <!-- 模型图像输入设置 -->
+    <string name="model_supports_vision">主模型支持图像输入</string>
+    <string name="model_supports_vision_desc">如果主模型可以直接处理图片则开启</string>
+
+    <!-- OCR 模型设置 -->
+    <string name="ocr_settings">OCR 模型设置</string>
+    <string name="ocr_settings_desc">当主模型不支持图像输入时使用</string>
+    <string name="hint_ocr_api_address">OCR API 地址</string>
+    <string name="hint_ocr_api_key">OCR API 密钥</string>
+    <string name="hint_ocr_model_name">OCR 模型</string>
+
+    <!-- 教程 -->
+    <string name="tutorial">教程</string>
+    <string name="tutorial_desc">获取 API 密钥和注册链接</string>
+    <string name="dialog_tutorial_title">获取免费额度</string>
+    <string name="dialog_tutorial_zhipu_title">智谱 AI</string>
+    <string name="dialog_tutorial_zhipu_register">注册页面（获取2000万Token）</string>
+    <string name="dialog_tutorial_zhipu_apikey">API 密钥页面</string>
+    <string name="dialog_tutorial_siliconflow_title">硅基流动</string>
+    <string name="dialog_tutorial_siliconflow_register">注册页面（获取2000万Token）</string>
+    <string name="dialog_tutorial_siliconflow_apikey">API 密钥页面</string>
+    <string name="dialog_tutorial_siliconflow_note">硅基流动有限时免费的 DeepSeek-OCR 模型</string>
+    <string name="dialog_tutorial_token_note">通过此链接注册可获取 2000 万免费 Token，可用于抵消付费模型费用</string>
 </resources>

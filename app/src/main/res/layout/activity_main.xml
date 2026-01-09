@@ -412,6 +412,202 @@
                             android:inputType="text" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- 主模型支持图像输入开关 -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardVisionSupport"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:cardBackgroundColor="@color/container"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="0dp"
+                        app:strokeWidth="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="16dp">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/model_supports_vision"
+                                    android:textColor="@color/textPrimary"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/model_supports_vision_desc"
+                                    android:textColor="@color/textSecondary"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/switchVisionSupport"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true" />
+
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- OCR 模型设置区域（条件显示） -->
+                    <LinearLayout
+                        android:id="@+id/layoutOcrSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:layout_marginBottom="8dp"
+                            android:text="@string/ocr_settings"
+                            android:textColor="@color/theme"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="8dp"
+                            android:text="@string/ocr_settings_desc"
+                            android:textColor="@color/textSecondary"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="?attr/textInputFilledStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="8dp"
+                            android:hint="@string/hint_ocr_api_address"
+                            app:boxBackgroundColor="@color/container"
+                            app:boxCornerRadiusBottomEnd="12dp"
+                            app:boxCornerRadiusBottomStart="12dp"
+                            app:boxCornerRadiusTopEnd="12dp"
+                            app:boxCornerRadiusTopStart="12dp"
+                            app:boxStrokeWidth="0dp"
+                            app:boxStrokeWidthFocused="0dp">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etOcrApiAddress"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textUri" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="?attr/textInputFilledStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="8dp"
+                            android:hint="@string/hint_ocr_api_key"
+                            app:boxBackgroundColor="@color/container"
+                            app:boxCornerRadiusBottomEnd="12dp"
+                            app:boxCornerRadiusBottomStart="12dp"
+                            app:boxCornerRadiusTopEnd="12dp"
+                            app:boxCornerRadiusTopStart="12dp"
+                            app:boxStrokeWidth="0dp"
+                            app:boxStrokeWidthFocused="0dp">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etOcrApiKey"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:importantForAutofill="no"
+                                android:inputType="textPassword|textNoSuggestions" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="?attr/textInputFilledStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/hint_ocr_model_name"
+                            app:boxBackgroundColor="@color/container"
+                            app:boxCornerRadiusBottomEnd="12dp"
+                            app:boxCornerRadiusBottomStart="12dp"
+                            app:boxCornerRadiusTopEnd="12dp"
+                            app:boxCornerRadiusTopStart="12dp"
+                            app:boxStrokeWidth="0dp"
+                            app:boxStrokeWidthFocused="0dp">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etOcrModelName"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <!-- 教程卡片 -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardTutorial"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:cardBackgroundColor="@color/container"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="0dp"
+                        app:strokeWidth="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/school"
+                                app:tint="@color/textPrimary" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="16dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tutorial"
+                                    android:textColor="@color/textPrimary"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tutorial_desc"
+                                    android:textColor="@color/textSecondary"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/arrow_right"
+                                app:tint="@color/textSecondary" />
+
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
                 </LinearLayout>
             </ScrollView>
 

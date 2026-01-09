@@ -68,4 +68,28 @@
 
     <string name="label_screenshot_recognition">Screenshot Recognition</string>
     <string name="label_accessibility_service">CustomLand Screenshot Recognition Service</string>
+
+    <!-- 模型图像输入设置 -->
+    <string name="model_supports_vision">Model Supports Image Input</string>
+    <string name="model_supports_vision_desc">Enable if your main model can accept images directly</string>
+
+    <!-- OCR 模型设置 -->
+    <string name="ocr_settings">OCR Model Settings</string>
+    <string name="ocr_settings_desc">Used if main model doesn\'t support image input</string>
+    <string name="hint_ocr_api_address">OCR API Address</string>
+    <string name="hint_ocr_api_key">OCR API Key</string>
+    <string name="hint_ocr_model_name">OCR Model Name</string>
+
+    <!-- 教程 -->
+    <string name="tutorial">Tutorial</string>
+    <string name="tutorial_desc">Get API keys and registration links</string>
+    <string name="dialog_tutorial_title">Get Free Tokens</string>
+    <string name="dialog_tutorial_zhipu_title">Zhipu AI</string>
+    <string name="dialog_tutorial_zhipu_register">Registration (20M free tokens)</string>
+    <string name="dialog_tutorial_zhipu_apikey">API Key Page</string>
+    <string name="dialog_tutorial_siliconflow_title">SiliconFlow</string>
+    <string name="dialog_tutorial_siliconflow_register">Registration (20M free tokens)</string>
+    <string name="dialog_tutorial_siliconflow_apikey">API Key Page</string>
+    <string name="dialog_tutorial_siliconflow_note">SiliconFlow offers free DeepSeek-OCR model</string>
+    <string name="dialog_tutorial_token_note">Register via this link to get 20M free tokens, which can be used to offset paid model costs</string>
 </resources>

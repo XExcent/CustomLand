@@ -8,6 +8,7 @@ import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import com.dylanc.longan.logInfo
 import com.mukapp.customland.R
+import com.mukapp.customland.common.Constants
 import com.mukapp.customland.common.MMKVHelper
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -24,25 +25,50 @@ import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
 
 object AiRecognizer {
+    // 主模型配置
     var api: String = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
     var apikey: String = ""
     var model: String = "glm-4v-flash"
 
+    // 是否支持图像输入
+    var supportsVision: Boolean = true
+
+    // OCR 模型配置
+    var ocrApi: String = "https://api.siliconflow.cn/v1/chat/completions"
+    var ocrApikey: String = ""
+    var ocrModel: String = "Pro/deepseek-ai/DeepSeek-OCR"
+
     /** 从 MMKV 加载最新配置 */
     private fun loadConfig() {
         api = MMKVHelper.getString(
-            com.mukapp.customland.common.Constants.PREF_API_ADDRESS,
+            Constants.PREF_API_ADDRESS,
             api
         )
         apikey = MMKVHelper.getString(
-            com.mukapp.customland.common.Constants.PREF_API_KEY,
+            Constants.PREF_API_KEY,
             apikey
         )
         model = MMKVHelper.getString(
-            com.mukapp.customland.common.Constants.PREF_MODEL_NAME,
+            Constants.PREF_MODEL_NAME,
             model
         )
-        logDebug("已加载 API 配置：api=$api, model=$model, apikey=${if (apikey.isNotEmpty()) "***已设置***" else "未设置"}")
+        supportsVision = MMKVHelper.getBoolean(
+            Constants.PREF_MODEL_SUPPORTS_VISION,
+            true
+        )
+        ocrApi = MMKVHelper.getString(
+            Constants.PREF_OCR_API_ADDRESS,
+            ocrApi
+        )
+        ocrApikey = MMKVHelper.getString(
+            Constants.PREF_OCR_API_KEY,
+            ocrApikey
+        )
+        ocrModel = MMKVHelper.getString(
+            Constants.PREF_OCR_MODEL_NAME,
+            ocrModel
+        )
+        logDebug("已加载 API 配置：api=$api, model=$model, supportsVision=$supportsVision, apikey=${if (apikey.isNotEmpty()) "***已设置***" else "未设置"}")
     }
 
     /**
@@ -64,7 +90,12 @@ object AiRecognizer {
                 // 每次请求都从 MMKV 加载最新配置
                 loadConfig()
 
-                logDebug("开始请求")
+                logDebug("开始请求，supportsVision=$supportsVision")
+
+                // 如果主模型不支持图像输入，使用两阶段识别
+                if (!supportsVision) {
+                    return@withContext analyzeWithOcr(context, bitmap, screenshotPath, startTime)
+                }
 
                 val byteArrayOutputStream = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
@@ -290,6 +321,318 @@ object AiRecognizer {
         return regex.replace(json) { matchResult ->
             // 保留头部(组1)，替换数据部分(组2)
             "${matchResult.groupValues[1]}......(已省略Base64数据)......"
+        }
+    }
+
+    /**
+     * 使用 OCR 模型识别图片中的文字
+     * @param bitmap 待识别图片
+     * @return OCR 识别结果文字，如果失败则返回 null
+     */
+    private fun performOcr(bitmap: Bitmap): String? {
+        try {
+            logDebug("开始 OCR 识别")
+
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+            val base64Image =
+                Base64.encodeToString(byteArrayOutputStream.toByteArray(), Base64.NO_WRAP)
+
+            // 构建 OCR 请求 JSON
+            val jsonObject = buildJsonObject {
+                put("model", ocrModel)
+                putJsonArray("messages") {
+                    addJsonObject {
+                        put("role", "user")
+                        putJsonArray("content") {
+                            addJsonObject {
+                                put("type", "image_url")
+                                putJsonObject("image_url") {
+                                    put("url", "data:image/jpeg;base64,$base64Image")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            val jsonInputString = jsonObject.toString()
+
+            // 建立网络连接
+            val url = URL(ocrApi)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $ocrApikey")
+            connection.doOutput = true
+
+            connection.outputStream.use { os ->
+                val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                os.write(input, 0, input.size)
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response =
+                    connection.inputStream.bufferedReader(Charsets.UTF_8).use {
+                        it.readText()
+                    }
+                logDebug("OCR 请求成功，响应：$response")
+
+                val jsonResponse = JSONObject(response)
+                val ocrText =
+                    jsonResponse
+                        .getJSONArray("choices")
+                        .getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content")
+
+                return ocrText
+            } else {
+                val error =
+                    connection.errorStream.bufferedReader(Charsets.UTF_8).use {
+                        it.readText()
+                    }
+                logError("OCR 请求失败，响应码：$responseCode，错误：$error")
+                return null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            logError("OCR 请求出错", e)
+            return null
+        }
+    }
+
+    /**
+     * 使用纯文本调用主模型提取信息
+     * @param ocrText OCR 识别出的文字
+     * @param languageTag 语言标签
+     * @return 主模型的响应内容，如果失败则返回 null
+     */
+    private fun extractInfoFromText(ocrText: String, languageTag: String?): String? {
+        try {
+            logDebug("开始从文字提取信息")
+
+            val promptText = """
+                # Role
+                你是一个专为"灵动岛"UI设计的各种截图信息提取专家。你的任务是从以下OCR识别的文字中提取关键信息，并将其转化为符合严格UI限制的结构化JSON数据。
+                
+                # Language
+                用户设备的语言设置为：${languageTag}，请根据此语言输出。
+                
+                # Critical Constraints (最高优先级)
+                1. **输出格式**：仅输出纯 JSON 字符串。严禁使用 ```json 代码块、Markdown 标记或任何解释性文字。
+                2. **容错处理**：识别不到的非必填字段返回空字符串""
+                
+                # Extraction Rules (字段定义)
+                请根据以下逻辑提取并映射字段：
+                
+                ## 1. title (String, 必填)
+                * **定义**：用户完成线下动作所需的最核心凭证（如取餐码、取件码、座位号、登机口）。
+                * **特征**：通常是数字、字母组合，视觉上最醒目。
+                * **处理**：去除"取餐码"等前缀，只保留核心字符（如 "取餐码 A888" -> "A888"）。
+                
+                ## 2. content (String, 必填)
+                * **定义**：title 的简短描述标签。
+                * **限制**：严格控制在 2-4 个汉字（如：取餐码、快递柜、登机口、检票口）。
+                
+                ## 3. info (String, 选填)
+                * **定义**：辅助详情。
+                * **优先级**：核心商品/服务名 > 店铺/地点 > 备注/时间。
+                * **格式**：使用 `\n` 换行。最多 3 行，尽量 2 行。
+                * **长度控制**：每行不超过 12 个全角字符，太长可缩略（例如"肯德基（北京大学第三分店）" -> "肯德基(北大店)"）。
+                
+                ## 4. iconType (String, 枚举, 必填)
+                根据文字内容，精确匹配以下枚举值之一。若不确定，优先使用泛类（如 TAKEOUT_BAG）。
+                * **饮品类**：MILK_TEA (奶茶/果茶), COFFEE (咖啡)
+                * **主食类**：BURGER (汉堡/西餐), FRIED_CHICKEN (炸鸡/小食), RICE_BOWL (米饭/简餐), NOODLES (面条/粉/螺蛳粉), PIZZA (披萨)
+                * **甜品类**：DESSERT (甜品/冰淇淋), CAKE (蛋糕/面包), FRUIT (水果)
+                * **通用/物流**：TAKEOUT_BAG (无法区分具体食物/混合外卖), PACKAGE (快递包裹/物流), SHOPPING_BAG (商超购物)
+                * **默认**：RECEIPT (小票/排号单/其他)
+                
+                ## 5. buttonText (String, 必填)
+                * **逻辑**：
+                    * 取餐/取件/核销 -> "已取"
+                    * 排队/等位 -> "不等了"
+                    * 通知/票务 -> "知道了"
+                * **限制**：2-3 个汉字。
+                
+                # Output Schema
+                {
+                  "title": "String",
+                  "content": "String",
+                  "info": "String",
+                  "iconType": "Enum String",
+                  "buttonText": "String"
+                }
+                
+                # OCR 识别的文字内容
+                $ocrText
+            """.trimIndent()
+
+            // 构建纯文本请求 JSON
+            val jsonObject = buildJsonObject {
+                put("model", model)
+                putJsonArray("messages") {
+                    addJsonObject {
+                        put("role", "user")
+                        put("content", promptText)
+                    }
+                }
+            }
+
+            val jsonInputString = jsonObject.toString()
+
+            // 建立网络连接
+            val url = URL(api)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $apikey")
+            connection.doOutput = true
+
+            connection.outputStream.use { os ->
+                val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                os.write(input, 0, input.size)
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response =
+                    connection.inputStream.bufferedReader(Charsets.UTF_8).use {
+                        it.readText()
+                    }
+                logDebug("主模型请求成功，响应：$response")
+
+                val jsonResponse = JSONObject(response)
+                return jsonResponse
+                    .getJSONArray("choices")
+                    .getJSONObject(0)
+                    .getJSONObject("message")
+                    .getString("content")
+            } else {
+                val error =
+                    connection.errorStream.bufferedReader(Charsets.UTF_8).use {
+                        it.readText()
+                    }
+                logError("主模型请求失败，响应码：$responseCode，错误：$error")
+                return null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            logError("主模型请求出错", e)
+            return null
+        }
+    }
+
+    /**
+     * 两阶段识别：先用 OCR 识别，再用主模型提取信息
+     * @param context 上下文
+     * @param bitmap 待识别截图
+     * @param screenshotPath 截图保存路径（可选）
+     * @return 识别结果
+     */
+    private fun analyzeWithOcr(
+        context: Context,
+        bitmap: Bitmap,
+        screenshotPath: String?,
+        startTime: Long
+    ): RecognizerResult {
+        var requestJson: String
+        var responseJson: String
+
+        // 第一阶段：OCR 识别
+        val ocrText = performOcr(bitmap)
+        if (ocrText == null) {
+            val duration = System.currentTimeMillis() - startTime
+            return RecognizerResult(
+                title = "OCR 失败",
+                content = "OCR识别失败",
+                error = true,
+                errorMessage = "OCR 模型请求失败",
+                screenshotPath = screenshotPath,
+                debugInfo = DebugInfo("OCR 请求失败", "无响应", duration)
+            )
+        }
+
+        requestJson = "OCR 结果：$ocrText"
+
+        // 第二阶段：主模型提取信息
+        val currentLocale =
+            ConfigurationCompat.getLocales(context.resources.configuration).get(0)
+        val languageTag = currentLocale?.toLanguageTag()
+
+        val extractedContent = extractInfoFromText(ocrText, languageTag)
+        if (extractedContent == null) {
+            val duration = System.currentTimeMillis() - startTime
+            return RecognizerResult(
+                title = "提取失败",
+                content = "信息提取失败",
+                error = true,
+                errorMessage = "主模型请求失败",
+                screenshotPath = screenshotPath,
+                debugInfo = DebugInfo(requestJson, "主模型请求失败", duration)
+            )
+        }
+
+        responseJson = extractedContent
+
+        // 解析结果
+        try {
+            val cleanedContent =
+                extractedContent.replace("```json", "").replace("```", "").trim()
+
+            val resultJson = JSONObject(cleanedContent)
+            val title = resultJson.optString("title")
+            val content = resultJson.optString("content")
+            val info = resultJson.optString("info")
+            val buttonText = resultJson.optString("buttonText", "已取")
+            val iconTypeStr = resultJson.optString("iconType", "RECEIPT")
+            val iconType =
+                try {
+                    IconType.valueOf(iconTypeStr)
+                } catch (_: IllegalArgumentException) {
+                    IconType.RECEIPT
+                }
+
+            val duration = System.currentTimeMillis() - startTime
+            val debugInfo =
+                DebugInfo(
+                    requestJson = requestJson,
+                    responseJson = responseJson,
+                    durationMs = duration
+                )
+
+            return if (title.isNotEmpty()) {
+                RecognizerResult(
+                    title = title,
+                    content = content,
+                    info = info,
+                    iconType = iconType,
+                    buttonText = buttonText,
+                    screenshotPath = screenshotPath,
+                    debugInfo = debugInfo
+                )
+            } else {
+                RecognizerResult(
+                    title = cleanedContent,
+                    content = "识别失败",
+                    error = true,
+                    errorMessage = "AI返回的title为空",
+                    screenshotPath = screenshotPath,
+                    debugInfo = debugInfo
+                )
+            }
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - startTime
+            return RecognizerResult(
+                title = e::class.simpleName ?: "Exception",
+                content = "解析异常",
+                error = true,
+                errorMessage = e.message ?: e.toString(),
+                screenshotPath = screenshotPath,
+                debugInfo = DebugInfo(requestJson, responseJson, duration)
+            )
         }
     }
 }

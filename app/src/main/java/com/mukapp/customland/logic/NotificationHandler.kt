@@ -271,6 +271,7 @@ object NotificationHandler {
                 .setOnlyAlertOnce(true)
                 .setRequestPromotedOngoing(true)
                 .setContentIntent(contentPendingIntent)
+                .setColor(context.getColor(R.color.theme))
 
         if (result.info.isNotEmpty()) {
             builder.setContentText(result.info)

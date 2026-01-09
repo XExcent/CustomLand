@@ -255,6 +255,50 @@ class MainActivity : AppCompatActivity() {
         binding.etApiKey.setupPreferenceWatcher(Constants.PREF_API_KEY)
         binding.etModelName.setupPreferenceWatcher(Constants.PREF_MODEL_NAME)
 
+        // 主模型图像输入开关设置
+        val supportsVision = MMKVHelper.getBoolean(Constants.PREF_MODEL_SUPPORTS_VISION, true)
+        binding.switchVisionSupport.isChecked = supportsVision
+        updateOcrSettingsVisibility(supportsVision)
+
+        // 点击卡片时切换开关
+        binding.cardVisionSupport.setOnClickListener {
+            binding.switchVisionSupport.isChecked = !binding.switchVisionSupport.isChecked
+        }
+
+        binding.switchVisionSupport.setOnCheckedChangeListener { _, isChecked ->
+            MMKVHelper.putBoolean(Constants.PREF_MODEL_SUPPORTS_VISION, isChecked)
+            updateOcrSettingsVisibility(isChecked)
+        }
+
+        // OCR 模型设置
+        binding.etOcrApiAddress.setText(
+            MMKVHelper.getString(
+                Constants.PREF_OCR_API_ADDRESS,
+                AiRecognizer.ocrApi
+            )
+        )
+        binding.etOcrApiKey.setText(
+            MMKVHelper.getString(
+                Constants.PREF_OCR_API_KEY,
+                AiRecognizer.ocrApikey
+            )
+        )
+        binding.etOcrModelName.setText(
+            MMKVHelper.getString(
+                Constants.PREF_OCR_MODEL_NAME,
+                AiRecognizer.ocrModel
+            )
+        )
+
+        binding.etOcrApiAddress.setupPreferenceWatcher(Constants.PREF_OCR_API_ADDRESS)
+        binding.etOcrApiKey.setupPreferenceWatcher(Constants.PREF_OCR_API_KEY)
+        binding.etOcrModelName.setupPreferenceWatcher(Constants.PREF_OCR_MODEL_NAME)
+
+        // 教程卡片点击事件
+        binding.cardTutorial.setOnClickListener {
+            showTutorialDialog()
+        }
+
         // 设置 BottomNavigationView 的监听器
         binding.bottomNav.setOnItemSelectedListener { item ->
             if (binding.bottomNav.selectedItemId == item.itemId) {
@@ -531,6 +575,56 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(getString(R.string.action_cancel), null)
             .setIcon(R.drawable.action_key)
+            .show()
+    }
+
+    /** 更新 OCR 设置区域的可见性 */
+    private fun updateOcrSettingsVisibility(supportsVision: Boolean) {
+        binding.layoutOcrSettings.visibility = if (supportsVision) View.GONE else View.VISIBLE
+    }
+
+    /** 显示教程对话框 */
+    private fun showTutorialDialog() {
+        val message = buildString {
+            appendLine(getString(R.string.dialog_tutorial_token_note))
+            appendLine()
+            appendLine("【${getString(R.string.dialog_tutorial_zhipu_title)}】")
+            appendLine("• ${getString(R.string.dialog_tutorial_zhipu_register)}")
+            appendLine("• ${getString(R.string.dialog_tutorial_zhipu_apikey)}")
+            appendLine()
+            appendLine("【${getString(R.string.dialog_tutorial_siliconflow_title)}】")
+            appendLine("• ${getString(R.string.dialog_tutorial_siliconflow_register)}")
+            appendLine("• ${getString(R.string.dialog_tutorial_siliconflow_apikey)}")
+            appendLine()
+            appendLine(getString(R.string.dialog_tutorial_siliconflow_note))
+        }
+
+        val items = arrayOf(
+            "${getString(R.string.dialog_tutorial_zhipu_title)} - ${getString(R.string.dialog_tutorial_zhipu_register)}",
+            "${getString(R.string.dialog_tutorial_zhipu_title)} - ${getString(R.string.dialog_tutorial_zhipu_apikey)}",
+            "${getString(R.string.dialog_tutorial_siliconflow_title)} - ${getString(R.string.dialog_tutorial_siliconflow_register)}",
+            "${getString(R.string.dialog_tutorial_siliconflow_title)} - ${getString(R.string.dialog_tutorial_siliconflow_apikey)}"
+        )
+
+        val urls = arrayOf(
+            "https://www.bigmodel.cn/invite?icode=DDcuAn9IU7nM6rPrg1%2FHDGczbXFgPRGIalpycrEwJ28%3D",
+            "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys",
+            "https://cloud.siliconflow.cn/i/ElzWYSiJ",
+            "https://cloud.siliconflow.cn/me/account/ak"
+        )
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
+
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(getString(R.string.dialog_tutorial_title))
+            .setMessage(message)
+            .setAdapter(adapter) { _, which ->
+                val intent = Intent(Intent.ACTION_VIEW, urls[which].toUri())
+                startActivity(intent)
+            }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.school)
             .show()
     }
 }
