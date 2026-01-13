@@ -14,8 +14,8 @@ android {
         applicationId = "com.mukapp.customland"
         minSdk = 30
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.4 alpha"
+        versionCode = 6
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
