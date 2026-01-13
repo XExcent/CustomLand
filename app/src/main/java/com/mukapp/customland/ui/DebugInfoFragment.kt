@@ -23,8 +23,20 @@ class DebugInfoFragment : Fragment() {
             val requestJson = it.getString(ARG_REQUEST_JSON)
             val responseJson = it.getString(ARG_RESPONSE_JSON)
             val duration = it.getLong(ARG_DURATION)
+            val ocrRequestJson = it.getString(ARG_OCR_REQUEST_JSON)
+            val ocrResponseJson = it.getString(ARG_OCR_RESPONSE_JSON)
+            val ocrDuration =
+                if (it.containsKey(ARG_OCR_DURATION)) it.getLong(ARG_OCR_DURATION) else null
+
             if (requestJson != null && responseJson != null) {
-                debugInfo = DebugInfo(requestJson, responseJson, duration)
+                debugInfo = DebugInfo(
+                    requestJson = requestJson,
+                    responseJson = responseJson,
+                    durationMs = duration,
+                    ocrRequestJson = ocrRequestJson,
+                    ocrResponseJson = ocrResponseJson,
+                    ocrDurationMs = ocrDuration
+                )
             }
         }
     }
@@ -42,20 +54,41 @@ class DebugInfoFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         if (debugInfo != null) {
-            // 显示耗时
-            binding.tvDuration.text = getString(R.string.duration_format, debugInfo!!.durationMs)
+            val info = debugInfo!!
 
-            // 显示请求JSON（格式化）
-            binding.tvRequestJson.text = formatJson(debugInfo!!.requestJson)
+            // 检查是否有 OCR 调试信息（两阶段模式）
+            val hasOcrInfo = info.ocrRequestJson != null && info.ocrResponseJson != null
 
-            // 显示响应JSON（格式化）
-            binding.tvResponseJson.text = formatJson(debugInfo!!.responseJson)
+            if (hasOcrInfo) {
+                // 显示 OCR 分组
+                binding.cardOcrSection.visibility = View.VISIBLE
+                binding.tvMainModelSection.visibility = View.VISIBLE
+
+                // OCR 耗时
+                binding.tvOcrDuration.text =
+                    getString(R.string.duration_format, info.ocrDurationMs ?: 0)
+
+                // OCR 请求/响应 JSON
+                binding.tvOcrRequestJson.text = formatJson(info.ocrRequestJson)
+                binding.tvOcrResponseJson.text = formatJson(info.ocrResponseJson)
+            } else {
+                // 隐藏 OCR 分组
+                binding.cardOcrSection.visibility = View.GONE
+                binding.tvMainModelSection.visibility = View.GONE
+            }
+
+            // 显示主模型调试信息
+            binding.tvDuration.text = getString(R.string.duration_format, info.durationMs)
+            binding.tvRequestJson.text = formatJson(info.requestJson)
+            binding.tvResponseJson.text = formatJson(info.responseJson)
 
             binding.tvNoDebugInfo.visibility = View.GONE
         } else {
             binding.tvDuration.visibility = View.GONE
             binding.tvRequestJson.visibility = View.GONE
             binding.tvResponseJson.visibility = View.GONE
+            binding.cardOcrSection.visibility = View.GONE
+            binding.tvMainModelSection.visibility = View.GONE
             binding.tvNoDebugInfo.visibility = View.VISIBLE
         }
     }
@@ -79,6 +112,9 @@ class DebugInfoFragment : Fragment() {
         private const val ARG_REQUEST_JSON = "request_json"
         private const val ARG_RESPONSE_JSON = "response_json"
         private const val ARG_DURATION = "duration"
+        private const val ARG_OCR_REQUEST_JSON = "ocr_request_json"
+        private const val ARG_OCR_RESPONSE_JSON = "ocr_response_json"
+        private const val ARG_OCR_DURATION = "ocr_duration"
 
         fun newInstance(debugInfo: DebugInfo?) =
             DebugInfoFragment().apply {
@@ -88,6 +124,10 @@ class DebugInfoFragment : Fragment() {
                             putString(ARG_REQUEST_JSON, debugInfo.requestJson)
                             putString(ARG_RESPONSE_JSON, debugInfo.responseJson)
                             putLong(ARG_DURATION, debugInfo.durationMs)
+                            // OCR 调试信息（可选）
+                            debugInfo.ocrRequestJson?.let { putString(ARG_OCR_REQUEST_JSON, it) }
+                            debugInfo.ocrResponseJson?.let { putString(ARG_OCR_RESPONSE_JSON, it) }
+                            debugInfo.ocrDurationMs?.let { putLong(ARG_OCR_DURATION, it) }
                         }
                     }
             }

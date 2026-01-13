@@ -24,6 +24,11 @@ object Constants {
     const val PREF_OCR_API_KEY = "ocr_api_key" // OCR API 密钥
     const val PREF_OCR_MODEL_NAME = "ocr_model_name" // OCR 模型名称
 
+    // 提示词设置
+    const val PREF_PROMPT_VISION = "prompt_vision" // 主模型提示词（图像模式）
+    const val PREF_PROMPT_TEXT_EXTRACT = "prompt_text" // 主模型提示词（文本模式）
+    const val PREF_PROMPT_OCR = "prompt_ocr" // OCR 模型提示词
+
     // Intent Extra
     const val EXTRA_TARGET_PAGE = "EXTRA_TARGET_PAGE"
     const val TARGET_PAGE_SETTING = "setting"

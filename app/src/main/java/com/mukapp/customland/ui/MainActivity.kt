@@ -299,6 +299,29 @@ class MainActivity : AppCompatActivity() {
             showTutorialDialog()
         }
 
+        // 提示词设置点击事件
+        binding.cardPromptVision.setOnClickListener {
+            showPromptEditDialog(
+                getString(R.string.prompt_vision_title),
+                Constants.PREF_PROMPT_VISION,
+                AiRecognizer.DEFAULT_PROMPT_VISION
+            )
+        }
+        binding.cardPromptText.setOnClickListener {
+            showPromptEditDialog(
+                getString(R.string.prompt_text_extract_title),
+                Constants.PREF_PROMPT_TEXT_EXTRACT,
+                AiRecognizer.DEFAULT_PROMPT_TEXT_EXTRACT
+            )
+        }
+        binding.cardPromptOcr.setOnClickListener {
+            showPromptEditDialog(
+                getString(R.string.prompt_ocr_title),
+                Constants.PREF_PROMPT_OCR,
+                AiRecognizer.DEFAULT_PROMPT_OCR
+            )
+        }
+
         // 设置 BottomNavigationView 的监听器
         binding.bottomNav.setOnItemSelectedListener { item ->
             if (binding.bottomNav.selectedItemId == item.itemId) {
@@ -581,50 +604,174 @@ class MainActivity : AppCompatActivity() {
     /** 更新 OCR 设置区域的可见性 */
     private fun updateOcrSettingsVisibility(supportsVision: Boolean) {
         binding.layoutOcrSettings.visibility = if (supportsVision) View.GONE else View.VISIBLE
+
+        // 提示词设置可见性
+        if (supportsVision) {
+            // 主模型支持 Vision：只显示 Vision 提示词
+            binding.cardPromptVision.visibility = View.VISIBLE
+            binding.cardPromptText.visibility = View.GONE
+            binding.cardPromptOcr.visibility = View.GONE
+        } else {
+            // 主模型不支持 Vision（OCR 模式）：隐藏 Vision 提示词，显示 OCR 和 文本提取提示词
+            binding.cardPromptVision.visibility = View.GONE
+            binding.cardPromptText.visibility = View.VISIBLE
+            binding.cardPromptOcr.visibility = View.VISIBLE
+        }
     }
 
     /** 显示教程对话框 */
     private fun showTutorialDialog() {
-        val message = buildString {
-            appendLine(getString(R.string.dialog_tutorial_token_note))
-            appendLine()
-            appendLine("【${getString(R.string.dialog_tutorial_zhipu_title)}】")
-            appendLine("• ${getString(R.string.dialog_tutorial_zhipu_register)}")
-            appendLine("• ${getString(R.string.dialog_tutorial_zhipu_apikey)}")
-            appendLine()
-            appendLine("【${getString(R.string.dialog_tutorial_siliconflow_title)}】")
-            appendLine("• ${getString(R.string.dialog_tutorial_siliconflow_register)}")
-            appendLine("• ${getString(R.string.dialog_tutorial_siliconflow_apikey)}")
-            appendLine()
-            appendLine(getString(R.string.dialog_tutorial_siliconflow_note))
+        val zhipuRegisterUrl =
+            "https://www.bigmodel.cn/invite?icode=DDcuAn9IU7nM6rPrg1%2FHDGczbXFgPRGIalpycrEwJ28%3D"
+        val zhipuApikeyUrl = "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"
+        val siliconflowRegisterUrl = "https://cloud.siliconflow.cn/i/ElzWYSiJ"
+        val siliconflowApikeyUrl = "https://cloud.siliconflow.cn/me/account/ak"
+
+        val message = android.text.SpannableStringBuilder().apply {
+            append(getString(R.string.dialog_tutorial_token_note))
+            append("\n\n")
+
+            // 智谱 AI 部分
+            append("【${getString(R.string.dialog_tutorial_zhipu_title)}】\n")
+
+            val zhipuRegisterText = "• ${getString(R.string.dialog_tutorial_zhipu_register)}"
+            val zhipuRegisterStart = length
+            append(zhipuRegisterText)
+            setSpan(
+                object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        startActivity(Intent(Intent.ACTION_VIEW, zhipuRegisterUrl.toUri()))
+                    }
+                },
+                zhipuRegisterStart,
+                length,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            append("\n")
+
+            val zhipuApikeyText = "• ${getString(R.string.dialog_tutorial_zhipu_apikey)}"
+            val zhipuApikeyStart = length
+            append(zhipuApikeyText)
+            setSpan(
+                object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        startActivity(Intent(Intent.ACTION_VIEW, zhipuApikeyUrl.toUri()))
+                    }
+                },
+                zhipuApikeyStart,
+                length,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            append("\n\n")
+
+            // 硅基流动部分
+            append("【${getString(R.string.dialog_tutorial_siliconflow_title)}】\n")
+
+            val siliconflowRegisterText =
+                "• ${getString(R.string.dialog_tutorial_siliconflow_register)}"
+            val siliconflowRegisterStart = length
+            append(siliconflowRegisterText)
+            setSpan(
+                object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        startActivity(Intent(Intent.ACTION_VIEW, siliconflowRegisterUrl.toUri()))
+                    }
+                },
+                siliconflowRegisterStart,
+                length,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            append("\n")
+
+            val siliconflowApikeyText =
+                "• ${getString(R.string.dialog_tutorial_siliconflow_apikey)}"
+            val siliconflowApikeyStart = length
+            append(siliconflowApikeyText)
+            setSpan(
+                object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        startActivity(Intent(Intent.ACTION_VIEW, siliconflowApikeyUrl.toUri()))
+                    }
+                },
+                siliconflowApikeyStart,
+                length,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            append("\n\n")
+
+            append(getString(R.string.dialog_tutorial_siliconflow_note))
         }
 
-        val items = arrayOf(
-            "${getString(R.string.dialog_tutorial_zhipu_title)} - ${getString(R.string.dialog_tutorial_zhipu_register)}",
-            "${getString(R.string.dialog_tutorial_zhipu_title)} - ${getString(R.string.dialog_tutorial_zhipu_apikey)}",
-            "${getString(R.string.dialog_tutorial_siliconflow_title)} - ${getString(R.string.dialog_tutorial_siliconflow_register)}",
-            "${getString(R.string.dialog_tutorial_siliconflow_title)} - ${getString(R.string.dialog_tutorial_siliconflow_apikey)}"
-        )
-
-        val urls = arrayOf(
-            "https://www.bigmodel.cn/invite?icode=DDcuAn9IU7nM6rPrg1%2FHDGczbXFgPRGIalpycrEwJ28%3D",
-            "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys",
-            "https://cloud.siliconflow.cn/i/ElzWYSiJ",
-            "https://cloud.siliconflow.cn/me/account/ak"
-        )
-
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
-
-        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+        val dialog = MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
             .applyAppTheme()
             .setTitle(getString(R.string.dialog_tutorial_title))
             .setMessage(message)
-            .setAdapter(adapter) { _, which ->
-                val intent = Intent(Intent.ACTION_VIEW, urls[which].toUri())
-                startActivity(intent)
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .setIcon(R.drawable.key)
+            .show()
+
+        // 让 TextView 中的链接可点击
+        dialog.findViewById<android.widget.TextView>(android.R.id.message)?.movementMethod =
+            android.text.method.LinkMovementMethod.getInstance()
+    }
+
+    /** 显示提示词编辑对话框 */
+    private fun showPromptEditDialog(title: String, prefKey: String, defaultValue: String) {
+        val currentPrompt = MMKVHelper.getString(prefKey, defaultValue)
+        val editText = com.google.android.material.textfield.TextInputEditText(this)
+        editText.setText(currentPrompt)
+        editText.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+        editText.textSize = 14f
+        editText.background = null
+        editText.setPadding(0, 0, 0, 0)
+
+        // 使用 NestedScrollView 包裹 EditText 以处理滚动裁剪问题
+        val scrollView = androidx.core.widget.NestedScrollView(this)
+
+        // 自定义背景和圆角
+        val backgroundDrawable = GradientDrawable().apply {
+            setColor(ContextCompat.getColor(this@MainActivity, R.color.container))
+            cornerRadius = 12.dp
+        }
+        scrollView.background = backgroundDrawable
+
+        // 设置 Padding 并允许子视图在 Padding 区域绘制
+        val padding = 16.dp.toInt()
+        scrollView.setPadding(padding, padding, padding, padding)
+        scrollView.clipToPadding = false
+
+        scrollView.addView(editText)
+
+        // 使用 FrameLayout 作为容器来添加 Margin
+        val container = android.widget.FrameLayout(this)
+        // 使用相对固定的高度，防止输入法弹出时被顶出屏幕
+        // val scrollHeight = 250.dp.toInt()
+        val params = android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            // scrollHeight
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        params.leftMargin = 24.dp.toInt()
+        params.rightMargin = 24.dp.toInt()
+        params.topMargin = 16.dp.toInt()
+        scrollView.layoutParams = params
+        container.addView(scrollView)
+
+        MaterialAlertDialogBuilder(this, R.style.MyDialogTheme)
+            .applyAppTheme()
+            .setTitle(title)
+            .setView(container)
+            .setPositiveButton(getString(android.R.string.ok)) { _, _ ->
+                val newPrompt = editText.text.toString()
+                MMKVHelper.putString(prefKey, newPrompt)
+                toast(getString(R.string.toast_prompt_saved))
             }
             .setNegativeButton(getString(R.string.action_cancel), null)
-            .setIcon(R.drawable.school)
+            .setNeutralButton(getString(R.string.action_reset_default)) { _, _ ->
+                MMKVHelper.remove(prefKey) // 移除即恢复默认
+                toast(getString(R.string.toast_prompt_reset))
+            }
+            .setIcon(R.drawable.edit)
             .show()
     }
 }

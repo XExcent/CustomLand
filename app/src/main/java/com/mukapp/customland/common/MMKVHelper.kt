@@ -145,4 +145,8 @@ object MMKVHelper {
     fun putHistoryJson(key: String, value: String) {
         historyMMKV.encode(key, value)
     }
+
+    fun remove(key: String) {
+        defaultMMKV.removeValueForKey(key)
+    }
 }

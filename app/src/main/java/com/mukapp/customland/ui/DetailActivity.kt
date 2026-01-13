@@ -145,6 +145,13 @@ class DetailActivity : AppCompatActivity() {
         val tvResponseJson = binding.pageDebugInfo.tvResponseJson
         val tvNoDebugInfo = binding.pageDebugInfo.tvNoDebugInfo
 
+        // OCR 调试信息相关视图
+        val cardOcrSection = binding.pageDebugInfo.cardOcrSection
+        val tvMainModelSection = binding.pageDebugInfo.tvMainModelSection
+        val tvOcrDuration = binding.pageDebugInfo.tvOcrDuration
+        val tvOcrRequestJson = binding.pageDebugInfo.tvOcrRequestJson
+        val tvOcrResponseJson = binding.pageDebugInfo.tvOcrResponseJson
+
         val errorMessage = result?.errorMessage
         val debugInfo = result?.debugInfo
 
@@ -165,11 +172,37 @@ class DetailActivity : AppCompatActivity() {
 
         // 显示调试信息（如果有）
         if (debugInfo != null) {
+            // 检查是否有 OCR 调试信息（两阶段模式）
+            val hasOcrInfo = debugInfo.ocrRequestJson != null && debugInfo.ocrResponseJson != null
+
+            if (hasOcrInfo) {
+                // 显示 OCR 分组
+                cardOcrSection.visibility = View.VISIBLE
+                tvMainModelSection.visibility = View.VISIBLE
+
+                // OCR 耗时
+                tvOcrDuration.text =
+                    getString(R.string.duration_format, debugInfo.ocrDurationMs ?: 0)
+
+                // OCR 请求/响应 JSON
+                tvOcrRequestJson.text = formatJson(debugInfo.ocrRequestJson)
+                tvOcrResponseJson.text = formatJson(debugInfo.ocrResponseJson)
+            } else {
+                // 隐藏 OCR 分组
+                cardOcrSection.visibility = View.GONE
+                tvMainModelSection.visibility = View.GONE
+            }
+
+            // 显示主模型调试信息
             tvDuration.text = getString(R.string.duration_format, debugInfo.durationMs)
             tvRequestJson.text = formatJson(debugInfo.requestJson)
             tvResponseJson.text = formatJson(debugInfo.responseJson)
             tvNoDebugInfo.visibility = View.GONE
         } else {
+            // 隐藏 OCR 分组
+            cardOcrSection.visibility = View.GONE
+            tvMainModelSection.visibility = View.GONE
+
             // 如果没有调试信息但有错误信息，也不显示"暂无调试信息"
             if (errorMessage != null) {
                 tvDuration.visibility = View.GONE

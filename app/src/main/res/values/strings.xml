@@ -48,6 +48,13 @@
     <string name="debug_request_json">Request JSON</string>
     <string name="debug_response_json">Response JSON</string>
 
+    <!-- OCR 调试信息 -->
+    <string name="debug_ocr_section">OCR Model</string>
+    <string name="debug_main_model_section">Main Model</string>
+    <string name="debug_ocr_request_json">OCR Request JSON</string>
+    <string name="debug_ocr_response_json">OCR Response JSON</string>
+    <string name="debug_ocr_duration">OCR Duration</string>
+
     <string name="dialog_action_title">Select Action</string>
 
     <string name="action_settings">Enable</string>
@@ -81,8 +88,7 @@
     <string name="hint_ocr_model_name">OCR Model Name</string>
 
     <!-- 教程 -->
-    <string name="tutorial">Tutorial</string>
-    <string name="tutorial_desc">Get API keys and registration links</string>
+    <string name="tutorial">Get API Keys</string>
     <string name="dialog_tutorial_title">Get Free Tokens</string>
     <string name="dialog_tutorial_zhipu_title">Zhipu AI</string>
     <string name="dialog_tutorial_zhipu_register">Registration (20M free tokens)</string>
@@ -90,6 +96,16 @@
     <string name="dialog_tutorial_siliconflow_title">SiliconFlow</string>
     <string name="dialog_tutorial_siliconflow_register">Registration (20M free tokens)</string>
     <string name="dialog_tutorial_siliconflow_apikey">API Key Page</string>
-    <string name="dialog_tutorial_siliconflow_note">SiliconFlow offers free DeepSeek-OCR model</string>
+    <string name="dialog_tutorial_siliconflow_note">SiliconFlow offers the free GLM-4.1V-9B-Thinking model and limited-time free access to the DeepSeek-OCR model, available after real-name verification.</string>
     <string name="dialog_tutorial_token_note">Register via this link to get 20M free tokens, which can be used to offset paid model costs</string>
+
+    <!-- 提示词设置 -->
+    <string name="prompt_settings">Prompt Settings</string>
+    <string name="prompt_vision_title">Vision Model Prompt (Direct)</string>
+    <string name="prompt_text_extract_title">Vision Model Prompt (Text Extraction)</string>
+    <string name="prompt_ocr_title">OCR Model Prompt</string>
+    <string name="dialog_prompt_edit_title">Edit Prompt</string>
+    <string name="action_reset_default">Reset to Default</string>
+    <string name="toast_prompt_saved">Prompt saved</string>
+    <string name="toast_prompt_reset">Reset to default prompt</string>
 </resources>

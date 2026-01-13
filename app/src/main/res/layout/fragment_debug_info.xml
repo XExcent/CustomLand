@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
@@ -22,7 +23,8 @@
             app:cardBackgroundColor="@color/container"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
-            app:strokeWidth="0dp">
+            app:strokeWidth="0dp"
+            tools:visibility="visible">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -50,11 +52,97 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 耗时信息 -->
+        <!-- OCR 调试信息分组（两阶段识别时显示） -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardOcrSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/container"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- OCR 分组标题 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:text="@string/debug_ocr_section"
+                    android:textColor="@color/theme"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- OCR 耗时 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/debug_ocr_duration"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvOcrDuration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="14sp" />
+
+                <!-- OCR 请求 JSON -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/debug_ocr_request_json"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvOcrRequestJson"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/textPrimary"
+                    android:textIsSelectable="true"
+                    android:textSize="11sp" />
+
+                <!-- OCR 响应 JSON -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/debug_ocr_response_json"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvOcrResponseJson"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/textPrimary"
+                    android:textIsSelectable="true"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 主模型调试信息 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMainSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             app:cardBackgroundColor="@color/container"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
@@ -66,92 +154,73 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- 主模型分组标题（两阶段识别时显示） -->
+                <TextView
+                    android:id="@+id/tvMainModelSection"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:text="@string/debug_main_model_section"
+                    android:textColor="@color/theme"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <!-- 耗时 -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/debug_duration"
-                    android:textColor="@color/theme"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvDuration"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:textColor="@color/textPrimary"
-                    android:textSize="16sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    android:textSize="14sp" />
 
-        <!-- 请求JSON -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/container"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
+                <!-- 请求 JSON -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:text="@string/debug_request_json"
-                    android:textColor="@color/theme"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvRequestJson"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:fontFamily="monospace"
                     android:textColor="@color/textPrimary"
                     android:textIsSelectable="true"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    android:textSize="11sp" />
 
-        <!-- 响应JSON -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/container"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
+                <!-- 响应 JSON -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:text="@string/debug_response_json"
-                    android:textColor="@color/theme"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvResponseJson"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:fontFamily="monospace"
                     android:textColor="@color/textPrimary"
                     android:textIsSelectable="true"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -165,7 +234,8 @@
             android:text="@string/no_debug_info"
             android:textColor="@color/textSecondary"
             android:textSize="16sp"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:visibility="visible" />
 
     </LinearLayout>
 
