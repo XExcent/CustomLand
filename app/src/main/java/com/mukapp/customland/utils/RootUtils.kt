@@ -34,6 +34,7 @@ object RootUtils {
 
     /**
      * 通过 Root 权限开启无障碍服务
+     * 无论服务是否已在列表中，都会先关闭再重新开启，确保服务被重新初始化
      */
     fun enableAccessibilityServiceByRoot(context: Context, serviceClass: Class<*>): Boolean {
         try {
@@ -48,29 +49,41 @@ object RootUtils {
             var currentServices = getResult.output.trim()
             if (currentServices == "null") currentServices = ""
 
-            // 2. 检查是否已经包含
+            // 2. 先从列表中移除目标服务（如果存在）
+            // 这样可以确保服务被重新初始化，而不是仅仅刷新配置
+            val servicesWithoutTarget = currentServices
+                .split(":")
+                .filter { it.isNotEmpty() && it != targetService }
+                .joinToString(":")
+
+            logDebug("移除目标服务后的列表: $servicesWithoutTarget")
+
+            // 3. 如果服务之前在列表中，先关闭它
             if (currentServices.contains(targetService)) {
-                logDebug("无障碍服务已在列表中，无需添加")
-                // 即使在列表中，为了保险，有时也需要重新 enable 一下开关
-                executeCommand("su -c settings put secure accessibility_enabled 1")
-                return true
+                logDebug("服务已在列表中，先移除并关闭")
+                // 写入移除后的列表
+                val removeCmd =
+                    "settings put secure enabled_accessibility_services '$servicesWithoutTarget'"
+                executeCommand("su -c \"$removeCmd\"")
+                // 短暂等待，确保系统处理了关闭操作
+                Thread.sleep(300)
             }
 
-            // 3. 构建新列表
-            val newServices = if (currentServices.isEmpty()) {
+            // 4. 构建新列表（添加目标服务）
+            val newServices = if (servicesWithoutTarget.isEmpty()) {
                 targetService
             } else {
-                "$currentServices:$targetService"
+                "$servicesWithoutTarget:$targetService"
             }
 
-            // 4. 写入新配置并开启总开关
+            // 5. 写入新配置并开启总开关
             // 为了保证原子性和效率，将多条命令合并为一条执行
             val cmd =
                 "settings put secure enabled_accessibility_services '$newServices' && settings put secure accessibility_enabled 1"
             val setResult = executeCommand("su -c \"$cmd\"")
 
             val success = setResult.exitCode == 0
-            logDebug("通过 Root 开启无障碍服务: $success (services: $newServices)")
+            logDebug("通过 Root 重新开启无障碍服务: $success (services: $newServices)")
             return success
 
         } catch (e: Exception) {

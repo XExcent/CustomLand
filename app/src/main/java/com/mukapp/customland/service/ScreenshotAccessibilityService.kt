@@ -126,6 +126,7 @@ class ScreenshotAccessibilityService : AccessibilityService() {
         serviceScope.launch(Dispatchers.IO) {
             var notificationId: Int? = null
             var screenshotPath: String? = null
+            var notificationUpdated = false // 追踪通知是否已被更新
 
             try {
                 // 保存截图到内部存储
@@ -145,12 +146,9 @@ class ScreenshotAccessibilityService : AccessibilityService() {
                     recognitionResult,
                     notificationId
                 )
+                notificationUpdated = true // 标记通知已更新
             } catch (e: Exception) {
                 logError("识别失败", e)
-                // 取消"识别中"通知
-                notificationId?.let {
-                    NotificationHandler.cancelNotification(applicationContext, it)
-                }
                 // 构建错误结果并发送通知
                 val errorResult =
                     RecognizerResult(
@@ -160,8 +158,19 @@ class ScreenshotAccessibilityService : AccessibilityService() {
                         errorMessage = e.message ?: e.toString(),
                         screenshotPath = screenshotPath
                     )
-                NotificationHandler.sendNotification(applicationContext, errorResult)
+                // 如果已有通知ID，则更新它；否则创建新通知
+                if (notificationId != null) {
+                    NotificationHandler.sendNotification(applicationContext, errorResult, notificationId)
+                    notificationUpdated = true
+                } else {
+                    NotificationHandler.sendNotification(applicationContext, errorResult)
+                    notificationUpdated = true
+                }
             } finally {
+                // 确保"识别中"通知被清除（如果没有被更新的话）
+                if (!notificationUpdated && notificationId != null) {
+                    NotificationHandler.cancelNotification(applicationContext, notificationId)
+                }
                 // 释放Bitmap
                 bitmap.recycle()
             }
@@ -186,6 +195,7 @@ class ScreenshotAccessibilityService : AccessibilityService() {
     }
 
     // 收起通知栏
+    @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     fun closeNotificationShade() {
         // 需要 Android 12+
