@@ -1,6 +1,5 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+// 顶层构建文件，可在此添加所有子项目/模块的公共配置选项。
 plugins {
-    id("com.android.application") version "_" apply false
-    id("org.jetbrains.kotlin.android") version "_" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "_" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }

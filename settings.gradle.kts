@@ -10,13 +10,9 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-    plugins {
-        id("de.fayard.refreshVersions") version "0.60.6"
-    }
 }
-
 plugins {
-    id("de.fayard.refreshVersions")
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 dependencyResolutionManagement {
@@ -28,12 +24,5 @@ dependencyResolutionManagement {
     }
 }
 
-refreshVersions {
-    rejectVersionIf {
-        candidate.stabilityLevel.isLessStableThan(current.stabilityLevel)
-    }
-}
-
 rootProject.name = "CustomLand"
 include(":app")
- 

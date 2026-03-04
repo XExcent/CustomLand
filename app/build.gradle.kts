@@ -1,14 +1,11 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.mukapp.customland"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.mukapp.customland"
@@ -38,34 +35,34 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
-        }
-    }
 
     buildFeatures {
         viewBinding = true
     }
 }
 
-// noinspection GradleDynamicVersion
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
+}
+
 dependencies {
     // AndroidX / Google
-    implementation(AndroidX.core.ktx)
-    implementation(AndroidX.appCompat)
-    implementation(Google.android.material)
-    implementation(AndroidX.activity)
-    implementation(AndroidX.constraintLayout)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
 
-    // Test
-    testImplementation(Testing.junit4)
-    androidTestImplementation(AndroidX.test.ext.junit)
-    androidTestImplementation(AndroidX.test.espresso.core)
+    // 测试
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 
-    // Third Party
-    implementation("com.github.DylanCaiCoding.Longan:longan:_")
-    implementation(KotlinX.serialization.json)
-    implementation("com.github.Dimezis:BlurView:_")
-    implementation("com.tencent:mmkv:_")
+    // 第三方库
+    implementation(libs.longan)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.blurview)
+    implementation(libs.mmkv)
 }
