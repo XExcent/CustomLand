@@ -9,12 +9,16 @@ import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import com.mukapp.customland.common.Constants.EXTRA_TARGET_PAGE
 import com.mukapp.customland.common.Constants.PREF_ROOT_ENABLED
+import com.mukapp.customland.common.Constants.PREF_USE_SHIZUKU_SCREENSHOT
 import com.mukapp.customland.common.Constants.TARGET_PAGE_SETTING
 import com.mukapp.customland.common.MMKVHelper
+import com.mukapp.customland.logic.NotificationHandler
+import com.mukapp.customland.logic.ScreenshotProcessor
 import com.mukapp.customland.service.ACTION_TAKE_SCREENSHOT
 import com.mukapp.customland.service.ScreenshotAccessibilityService
 import com.mukapp.customland.ui.MainActivity
 import com.mukapp.customland.utils.RootUtils
+import com.mukapp.customland.utils.ShizukuScreenshotHelper
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
 import kotlin.concurrent.thread
 
@@ -24,6 +28,13 @@ class TriggerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         logDebug("TriggerActivity 被调起")
+
+        val useShizuku = MMKVHelper.getBoolean(PREF_USE_SHIZUKU_SCREENSHOT, true)
+        if (useShizuku) {
+            handleShizukuScreenshot()
+            finish()
+            return
+        }
 
         if (!isAccessibilityServiceEnabled(ScreenshotAccessibilityService::class.java)) {
             logDebug("无障碍服务未开启")
@@ -94,6 +105,28 @@ class TriggerActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun handleShizukuScreenshot() {
+        if (!ShizukuScreenshotHelper.isShizukuAvailable()) {
+            notifyShizukuUnavailable()
+            return
+        }
+        if (!ShizukuScreenshotHelper.hasShizukuPermission()) {
+            notifyShizukuPermissionRequired()
+            return
+        }
+
+        thread {
+            val result = ShizukuScreenshotHelper.captureScreenshot()
+            result
+                .onSuccess { bitmap ->
+                    ScreenshotProcessor.processBitmap(applicationContext, bitmap)
+                }
+                .onFailure { error ->
+                    notifyShizukuCaptureFailed(error)
+                }
+        }
+    }
+
     private fun navigateToSettings() {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -101,5 +134,30 @@ class TriggerActivity : AppCompatActivity() {
         }
         startActivity(intent)
         finish()
+    }
+
+    private fun notifyShizukuUnavailable() {
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(R.string.shizuku_screenshot),
+            getString(R.string.shizuku_error_unavailable)
+        )
+    }
+
+    private fun notifyShizukuPermissionRequired() {
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(R.string.shizuku_screenshot),
+            getString(R.string.shizuku_error_permission_required)
+        )
+    }
+
+    private fun notifyShizukuCaptureFailed(error: Throwable) {
+        val message = error.message ?: error.toString()
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(R.string.shizuku_screenshot),
+            getString(R.string.shizuku_error_capture_failed, message)
+        )
     }
 }

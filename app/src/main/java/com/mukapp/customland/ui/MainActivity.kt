@@ -40,9 +40,11 @@ import com.mukapp.customland.logic.RecognizerResult
 import com.mukapp.customland.service.ScreenshotAccessibilityService
 import com.mukapp.customland.ui.adapter.NotificationAdapter
 import com.mukapp.customland.utils.RootUtils
+import com.mukapp.customland.utils.ShizukuScreenshotHelper
 import com.mukapp.customland.utils.applyAppTheme
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
 import com.mukapp.customland.utils.setupPreferenceWatcher
+import dev.rikka.shizuku.Shizuku
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,6 +68,20 @@ class MainActivity : AppCompatActivity() {
             updateNotificationStatus()
             if (!isGranted) {
                 showNotificationPermissionDialog()
+            }
+        }
+
+    private val shizukuPermissionResultListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode != SHIZUKU_PERMISSION_REQUEST_CODE) return@OnRequestPermissionResultListener
+            val granted = grantResult == PackageManager.PERMISSION_GRANTED
+            runOnUiThread {
+                if (granted) {
+                    toast(getString(R.string.toast_shizuku_permission_granted))
+                } else {
+                    toast(getString(R.string.toast_shizuku_permission_denied))
+                }
+                updateShizukuStatus()
             }
         }
 
@@ -186,6 +202,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.cardNotification.setOnClickListener { askNotificationPermission() }
+
+        // Shizuku 截图设置
+        val useShizuku = MMKVHelper.getBoolean(Constants.PREF_USE_SHIZUKU_SCREENSHOT, true)
+        binding.switchShizuku.isChecked = useShizuku
+        updateShizukuStatus()
+
+        binding.cardShizuku.setOnClickListener {
+            binding.switchShizuku.isChecked = !binding.switchShizuku.isChecked
+        }
+
+        binding.switchShizuku.setOnCheckedChangeListener { _, isChecked ->
+            MMKVHelper.putBoolean(Constants.PREF_USE_SHIZUKU_SCREENSHOT, isChecked)
+            if (isChecked) {
+                requestShizukuPermissionIfNeeded()
+            }
+            updateShizukuStatus()
+        }
+
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionResultListener)
 
         // Root 权限设置
         val isRootEnabled = MMKVHelper.getBoolean(Constants.PREF_ROOT_ENABLED, false)
@@ -462,6 +497,7 @@ class MainActivity : AppCompatActivity() {
         // 每次返回App时，都检查服务的状态
         updateServiceStatus()
         updateNotificationStatus()
+        updateShizukuStatus()
 
         // 如果启用了多任务隐藏功能，恢复时需要将其重新显示
         val hideFromRecents = MMKVHelper.getBoolean(Constants.PREF_HIDE_FROM_RECENTS, false)
@@ -491,6 +527,11 @@ class MainActivity : AppCompatActivity() {
             // 建议：处理完后清除 Extra，避免旋转屏幕等操作重复触发
             intent.removeExtra(Constants.EXTRA_TARGET_PAGE)
         }
+    }
+
+    override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionResultListener)
+        super.onDestroy()
     }
 
     private fun updateServiceStatus() {
@@ -540,6 +581,42 @@ class MainActivity : AppCompatActivity() {
         } else {
             binding.tvRootStatus.text = getString(R.string.root_permission_desc)
             binding.tvRootStatus.setTextColor(ContextCompat.getColor(this, R.color.textSecondary))
+        }
+    }
+
+    private fun requestShizukuPermissionIfNeeded() {
+        if (!ShizukuScreenshotHelper.isShizukuAvailable()) {
+            toast(getString(R.string.toast_shizuku_unavailable))
+            return
+        }
+        if (!ShizukuScreenshotHelper.hasShizukuPermission()) {
+            Shizuku.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
+        }
+    }
+
+    private fun updateShizukuStatus() {
+        if (!binding.switchShizuku.isChecked) {
+            binding.tvShizukuStatus.text = getString(R.string.shizuku_screenshot_desc)
+            binding.tvShizukuStatus.setTextColor(
+                ContextCompat.getColor(this, R.color.textSecondary)
+            )
+            return
+        }
+
+        if (!ShizukuScreenshotHelper.isShizukuAvailable()) {
+            binding.tvShizukuStatus.text = getString(R.string.shizuku_status_unavailable)
+            binding.tvShizukuStatus.setTextColor(Color.RED)
+            return
+        }
+
+        if (ShizukuScreenshotHelper.hasShizukuPermission()) {
+            binding.tvShizukuStatus.text = getString(R.string.shizuku_status_granted)
+            binding.tvShizukuStatus.setTextColor(
+                ContextCompat.getColor(this, R.color.textSecondary)
+            )
+        } else {
+            binding.tvShizukuStatus.text = getString(R.string.shizuku_status_permission_required)
+            binding.tvShizukuStatus.setTextColor(Color.RED)
         }
     }
 
@@ -773,5 +850,9 @@ class MainActivity : AppCompatActivity() {
             }
             .setIcon(R.drawable.edit)
             .show()
+    }
+
+    companion object {
+        private const val SHIZUKU_PERMISSION_REQUEST_CODE = 1001
     }
 }

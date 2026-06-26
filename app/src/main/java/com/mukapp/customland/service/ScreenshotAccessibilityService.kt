@@ -16,24 +16,15 @@ import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
-import com.mukapp.customland.logic.AiRecognizer
 import com.mukapp.customland.common.Constants.SCREENSHOT_DELAY_MS
+import com.mukapp.customland.logic.ScreenshotProcessor
 import com.mukapp.customland.logic.NotificationHandler
-import com.mukapp.customland.R
-import com.mukapp.customland.logic.RecognizerResult
-import java.io.File
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 // 广播 Action，用于从 TileService 触发
 const val ACTION_TAKE_SCREENSHOT = "com.mukapp.customland.ACTION_TAKE_SCREENSHOT"
 
 @SuppressLint("AccessibilityPolicy")
 class ScreenshotAccessibilityService : AccessibilityService() {
-    private val serviceJob = Job()
-    private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val screenshotReceiver =
@@ -92,7 +83,7 @@ class ScreenshotAccessibilityService : AccessibilityService() {
                         if (bitmap != null) {
                             // 复制一份，因为原始的 buffer 会被释放
                             val mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                            processImage(mutableBitmap)
+                            ScreenshotProcessor.processBitmap(applicationContext, mutableBitmap)
                         } else {
                             logError("无法封装硬件缓冲区")
                         }
@@ -121,79 +112,6 @@ class ScreenshotAccessibilityService : AccessibilityService() {
         )
     }
 
-    private fun processImage(bitmap: Bitmap) {
-        // 启动协程执行AI任务和发送通知
-        serviceScope.launch(Dispatchers.IO) {
-            var notificationId: Int? = null
-            var screenshotPath: String? = null
-            var notificationUpdated = false // 追踪通知是否已被更新
-
-            try {
-                // 保存截图到内部存储
-                screenshotPath = saveScreenshot(bitmap)
-
-                // 1. 调用AI识别 (占位符)
-                notificationId =
-                    NotificationHandler.sendNotification(
-                        applicationContext,
-                        RecognizerResult(title = getString(R.string.status_recognizing))
-                    )
-                val recognitionResult =
-                    AiRecognizer.analyze(applicationContext, bitmap, screenshotPath)
-                // 发送通知（无论成功还是失败）
-                NotificationHandler.sendNotification(
-                    applicationContext,
-                    recognitionResult,
-                    notificationId
-                )
-                notificationUpdated = true // 标记通知已更新
-            } catch (e: Exception) {
-                logError("识别失败", e)
-                // 构建错误结果并发送通知
-                val errorResult =
-                    RecognizerResult(
-                        title = e::class.simpleName ?: "Exception",
-                        content = "识别异常",
-                        error = true,
-                        errorMessage = e.message ?: e.toString(),
-                        screenshotPath = screenshotPath
-                    )
-                // 如果已有通知ID，则更新它；否则创建新通知
-                if (notificationId != null) {
-                    NotificationHandler.sendNotification(applicationContext, errorResult, notificationId)
-                    notificationUpdated = true
-                } else {
-                    NotificationHandler.sendNotification(applicationContext, errorResult)
-                    notificationUpdated = true
-                }
-            } finally {
-                // 确保"识别中"通知被清除（如果没有被更新的话）
-                if (!notificationUpdated && notificationId != null) {
-                    NotificationHandler.cancelNotification(applicationContext, notificationId)
-                }
-                // 释放Bitmap
-                bitmap.recycle()
-            }
-        }
-    }
-
-    /** 保存截图到内部存储 */
-    private fun saveScreenshot(bitmap: Bitmap): String {
-        val screenshotsDir = File(applicationContext.filesDir, "screenshots")
-        if (!screenshotsDir.exists()) {
-            screenshotsDir.mkdirs()
-        }
-
-        val timestamp = System.currentTimeMillis()
-        val filename = "screenshot_$timestamp.jpg"
-        val file = File(screenshotsDir, filename)
-
-        file.outputStream().use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out) }
-
-        logDebug("截图已保存：${file.absolutePath}")
-        return "screenshots/$filename" // 返回相对路径
-    }
-
     // 收起通知栏
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
@@ -219,8 +137,7 @@ class ScreenshotAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        // 取消所有协程并反注册接收器
-        serviceJob.cancel()
+        // 反注册接收器
         unregisterReceiver(screenshotReceiver)
         logDebug("辅助服务已销毁")
         super.onDestroy()

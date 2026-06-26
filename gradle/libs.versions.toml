@@ -24,6 +24,7 @@ espresso = "3.7.0"
 mmkv = "2.3.0"
 longan = "1.1.1"
 blurView = "version-3.2.0"
+shizuku = "13.1.5"
 
 [libraries]
 # AndroidX
@@ -47,6 +48,8 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 mmkv = { group = "com.tencent", name = "mmkv", version.ref = "mmkv" }
 longan = { group = "com.github.DylanCaiCoding.Longan", name = "longan", version.ref = "longan" }
 blurview = { group = "com.github.Dimezis", name = "BlurView", version.ref = "blurView" }
+shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }
+shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref = "shizuku" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

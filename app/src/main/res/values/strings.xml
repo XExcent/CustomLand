@@ -18,6 +18,12 @@
     <string name="root_permission">Root Permission (Optional)</string>
     <string name="root_permission_desc">Root access allows automatic enabling of accessibility services during recognition.</string>
 
+    <string name="shizuku_screenshot">Shizuku Screenshot</string>
+    <string name="shizuku_screenshot_desc">Capture screenshots using Shizuku instead of Accessibility Service.</string>
+    <string name="shizuku_status_unavailable">Unavailable</string>
+    <string name="shizuku_status_permission_required">Permission required</string>
+    <string name="shizuku_status_granted">Granted</string>
+
     <string name="status_enabled">Enabled</string>
     <string name="status_disabled">Disabled</string>
     <string name="status_root_granted">Granted</string>
@@ -72,6 +78,13 @@
     <string name="toast_enable_accessibility">Please enable Accessibility Service first</string>
     <string name="toast_resent">Notification resent</string>
     <string name="toast_deleted">Deleted</string>
+    <string name="toast_shizuku_unavailable">Shizuku is not available. Please install and start it.</string>
+    <string name="toast_shizuku_permission_granted">Shizuku permission granted</string>
+    <string name="toast_shizuku_permission_denied">Shizuku permission denied</string>
+
+    <string name="shizuku_error_unavailable">Shizuku is not available. Please install and start it.</string>
+    <string name="shizuku_error_permission_required">Shizuku permission required. Open the app to grant it.</string>
+    <string name="shizuku_error_capture_failed">Shizuku screenshot failed: %1$s</string>
 
     <string name="label_screenshot_recognition">Screenshot Recognition</string>
     <string name="label_accessibility_service">CustomLand Screenshot Recognition Service</string>

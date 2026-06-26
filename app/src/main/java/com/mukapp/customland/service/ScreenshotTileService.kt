@@ -12,8 +12,13 @@ import com.dylanc.longan.logDebug
 import com.dylanc.longan.logError
 import com.mukapp.customland.common.Constants.EXTRA_TARGET_PAGE
 import com.mukapp.customland.common.Constants.PREF_ROOT_ENABLED
+import com.mukapp.customland.common.Constants.PREF_USE_SHIZUKU_SCREENSHOT
+import com.mukapp.customland.common.Constants.SCREENSHOT_DELAY_MS
 import com.mukapp.customland.common.Constants.TARGET_PAGE_SETTING
 import com.mukapp.customland.common.MMKVHelper
+import com.mukapp.customland.logic.NotificationHandler
+import com.mukapp.customland.logic.ScreenshotProcessor
+import com.mukapp.customland.utils.ShizukuScreenshotHelper
 import com.mukapp.customland.ui.MainActivity
 import com.mukapp.customland.utils.RootUtils
 import com.mukapp.customland.utils.isAccessibilityServiceEnabled
@@ -32,6 +37,12 @@ class ScreenshotTileService : TileService() {
     override fun onClick() {
         super.onClick()
         logDebug("磁贴点击")
+
+        val useShizuku = MMKVHelper.getBoolean(PREF_USE_SHIZUKU_SCREENSHOT, true)
+        if (useShizuku) {
+            takeScreenshotWithShizuku(fromTile = true)
+            return
+        }
 
         if (!isAccessibilityServiceEnabled()) {
             logDebug("无障碍服务未开启")
@@ -91,6 +102,40 @@ class ScreenshotTileService : TileService() {
         sendScreenshotBroadcast()
     }
 
+    private fun takeScreenshotWithShizuku(fromTile: Boolean) {
+        if (!ShizukuScreenshotHelper.isShizukuAvailable()) {
+            notifyShizukuUnavailable()
+            return
+        }
+        if (!ShizukuScreenshotHelper.hasShizukuPermission()) {
+            notifyShizukuPermissionRequired()
+            return
+        }
+
+        if (fromTile) {
+            closeNotificationShade()
+            Handler(Looper.getMainLooper()).postDelayed(
+                { captureShizukuScreenshot() },
+                SCREENSHOT_DELAY_MS
+            )
+        } else {
+            captureShizukuScreenshot()
+        }
+    }
+
+    private fun captureShizukuScreenshot() {
+        thread {
+            val result = ShizukuScreenshotHelper.captureScreenshot()
+            result
+                .onSuccess { bitmap ->
+                    ScreenshotProcessor.processBitmap(applicationContext, bitmap)
+                }
+                .onFailure { error ->
+                    notifyShizukuCaptureFailed(error)
+                }
+        }
+    }
+
     /** 发送截图广播 */
     private fun sendScreenshotBroadcast() {
         val intent = Intent(ACTION_TAKE_SCREENSHOT).apply {
@@ -99,6 +144,31 @@ class ScreenshotTileService : TileService() {
         }
         sendBroadcast(intent)
         logDebug("截图广播已发送")
+    }
+
+    private fun notifyShizukuUnavailable() {
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(com.mukapp.customland.R.string.shizuku_screenshot),
+            getString(com.mukapp.customland.R.string.shizuku_error_unavailable)
+        )
+    }
+
+    private fun notifyShizukuPermissionRequired() {
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(com.mukapp.customland.R.string.shizuku_screenshot),
+            getString(com.mukapp.customland.R.string.shizuku_error_permission_required)
+        )
+    }
+
+    private fun notifyShizukuCaptureFailed(error: Throwable) {
+        val message = error.message ?: error.toString()
+        NotificationHandler.sendStandardNotification(
+            applicationContext,
+            getString(com.mukapp.customland.R.string.shizuku_screenshot),
+            getString(com.mukapp.customland.R.string.shizuku_error_capture_failed, message)
+        )
     }
 
     /** 跳转到设置页 */
@@ -125,6 +195,10 @@ class ScreenshotTileService : TileService() {
                 startActivityAndCollapse(intent)
             }
         }
+    }
+
+    private fun closeNotificationShade() {
+        sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
     }
 
     /** 检查无障碍服务是否已启用 */

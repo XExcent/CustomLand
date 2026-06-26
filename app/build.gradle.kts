@@ -65,4 +65,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.blurview)
     implementation(libs.mmkv)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
 }

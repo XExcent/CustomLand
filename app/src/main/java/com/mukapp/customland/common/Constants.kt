@@ -17,6 +17,7 @@ object Constants {
     const val PREF_MODEL_NAME = "model_name"
     const val PREF_ROOT_ENABLED = "root_enabled"
     const val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
+    const val PREF_USE_SHIZUKU_SCREENSHOT = "use_shizuku_screenshot"
 
     // AI 模型设置
     const val PREF_MODEL_SUPPORTS_VISION = "model_supports_vision" // 主模型是否支持图像输入

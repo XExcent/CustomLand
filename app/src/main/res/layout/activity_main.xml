@@ -218,6 +218,62 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
+                    <!-- Shizuku Screenshot Card -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardShizuku"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        app:cardBackgroundColor="@color/container"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="0dp"
+                        app:strokeWidth="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/key"
+                                app:tint="@color/textPrimary" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="16dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/shizuku_screenshot"
+                                    android:textColor="@color/textPrimary"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/tvShizukuStatus"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/shizuku_screenshot_desc"
+                                    android:textColor="@color/textSecondary"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/switchShizuku"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" />
+
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
                     <!-- Root Permission Card -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardRoot"
